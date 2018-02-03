@@ -66,23 +66,48 @@ bool NetworkIO::set_socket_nonblocking(uint32_t sockfd)
 
 //----------------------------------------------------------------------
 
+/*
+ * read_from_socket: Return values
+ *     Returns number of bytes that are read from socket during successful read.
+ *     0 - if the socket is blocked and nothing is read 
+ *     -1 - if connection is closed
+ *     -2 - in case of unknown errors
+ */
 int32_t NetworkIO::read_from_socket(uint32_t sockfd, uint8_t* data_ptr, uint16_t max_len)
 {
-//    std::cout << __func__ << " " << std::endl;
+    //    std::cout << __func__ << " " << std::endl;
+    for(;;) {
+	int32_t rv = read(sockfd, data_ptr, max_len);
 
-    int32_t rv = read(sockfd, data_ptr, max_len);
-
-    if (rv > 0) return rv;
-
-    if (errno != 0) 
-        return -1;
-        
+	if (rv > 0) {
+	    return rv;
+	} else if (rv == 0) {
+	    /* VP: connection closed by opposite end */
+	    /* VP: do the cleanup */
+	    return -1;
+	} else {
+	    /* VP: check if it has returned due to a signal
+	       or has been blocked */
+	    if(errno == EINTR) {
+		/* VP: loop again */
+	    } else if(errno == EAGAIN || errno == EWOULDBLOCK) {
+		/* VP: socket is blocked,
+		   let's wait for next set of data */
+		return 0;
+	    } else {
+		/* VP: Fatal error, we should not continue */
+		return -2;
+	    }
+	}
+    }
     return 0;
 }
 
 
 //----------------------------------------------------------------------
-// Return the number of bytes read
+// Returns
+// - no of bytes written to an fd, sets try_again=true if fd is blocked
+// - -1 in case of an error
 int32_t NetworkIO::write_to_socket(uint32_t sockfd, const uint8_t* data_ptr, uint16_t data_len, bool& try_again)
 {
 //    std::cout << __func__ << " " << std::endl;
@@ -123,8 +148,10 @@ int32_t NetworkIO::send_to_peer(uint32_t sockfd, const uint8_t* data, uint16_t d
 
     int32_t bytes = write_to_socket(sockfd, data, data_len, try_again);
 
-    if (bytes == -1 && !try_again) {
+    if (bytes == -1) {
         on_disconnect(sockfd);
+    } else {
+	
     }
 
     return bytes;

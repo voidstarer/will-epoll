@@ -24,47 +24,50 @@ public:
 	}
 
 	virtual void on_disconnect(uint32_t client_sfd)
-    {
-       std::cout << __func__ << " Client=" << client_sfd << std::endl; 
-    }
+	{
+		std::cout << __func__ << " Client=" << client_sfd << " Closing socket" << std::endl; 
+		/* VP: do the cleanup of FD, remove it from epoll and free any data associated with it  */
+		close(client_sfd);
+	}
 
 	virtual void on_write_ready(uint32_t client_sfd) {
-    	std::cout << __func__ << " Client=" << client_sfd << std::endl;	
+		std::cout << __func__ << " Client=" << client_sfd << std::endl;	
 	}
 
+	/* returns timeout for epoll */
 	virtual int32_t on_get_standby() {
-   //	std::cout << __func__ << std::endl;
-    	return 10;	
+		//	std::cout << __func__ << std::endl;
+		return 10;	
 	}
 
-    virtual void on_loop() {
-    //	std::cout << __func__ << std::endl;
-    	if(count > 0)
-        {
-            char message[100];
-            sprintf(message, "Hello from server %dx2=%d [%d]\n", count, count*2, num++);
+	virtual void on_loop() {
+		//	std::cout << __func__ << std::endl;
+	}
 
-            bool try_again=true;
-            send_to_peer(_client, (uint8_t*)message, strlen(message), try_again); 
-            count--;
-        }
-    }
+	int send_reply_to_client(int client_sfd) {
+		char message[100];
+		sprintf(message, "Hello from server %dx2=%d [%d]\n", count, count*2, num++);
 
-    virtual void handle_data_received(uint32_t client_sfd, const uint8_t* data, uint16_t data_len)
-    {
-    	count++;
-    	_client = client_sfd;
-    	std::cout << __func__ << std::endl;
-    	for (int i = 0; i<data_len; i++) 
-		    std::cout << data[i];
-    }
+		bool try_again=true;
+		return send_to_peer(_client, (uint8_t*)message, strlen(message), try_again); 
+	}
+
+	virtual void handle_data_received(uint32_t client_sfd, const uint8_t* data, uint16_t data_len)
+	{
+		count++;
+		_client = client_sfd;
+		std::cout << __func__ << " count = " << count << " data_len=" << data_len << std::endl;
+		for (int i = 0; i<data_len; i++) 
+			std::cout << data[i];
+		std::cout << __func__ << std::endl;
+		send_reply_to_client(client_sfd);
+	}
 };
 
 
 int main()
 {
-    MyServer server(9000);
-    server.run();
-
-    return 0;
+	MyServer server(9000);
+	server.run();
+	return 0;
 }

@@ -159,17 +159,18 @@ void EventIO::handle_event(uint32_t peer_sfd, int32_t ev)
     std::cout << __func__ << " " << peer_sfd << std::endl;
 
 #ifdef OS_LINUX
-    //if (ev & EPOLLIN)    {std::cout << "EPOLLIN ";}
-    //if (ev & EPOLLPRI)   {std::cout << "EPOLLPRI ";}
-    //if (ev & EPOLLOUT)   {std::cout << "EPOLLOUT ";}
-    //if (ev & EPOLLERR)   {std::cout << "EPOLLERR ";}
-    //if (ev & EPOLLHUP)   {std::cout << "EPOLLHUP ";}
-    //if (ev & EPOLLRDHUP) {std::cout << "EPOLLRDHUP ";}
-    //std::cout << std::endl;
+    if (ev & EPOLLIN)    {std::cout << "EPOLLIN ";}
+    if (ev & EPOLLPRI)   {std::cout << "EPOLLPRI ";}
+    if (ev & EPOLLOUT)   {std::cout << "EPOLLOUT ";}
+    if (ev & EPOLLERR)   {std::cout << "EPOLLERR ";}
+    if (ev & EPOLLHUP)   {std::cout << "EPOLLHUP ";}
+    if (ev & EPOLLRDHUP) {std::cout << "EPOLLRDHUP ";}
+    std::cout << std::endl;
 
-    if ((ev & EPOLLIN) || (ev & EPOLLPRI)) {
+    if (ev & (EPOLLIN|EPOLLERR|EPOLLHUP|EPOLLRDHUP)) {
+	std::cout << __func__ << " " << peer_sfd << std::endl;
         on_data_received(peer_sfd);
-    } else if (ev & EPOLLOUT) {
+    } else if (ev & (EPOLLOUT|EPOLLHUP|EPOLLERR)) {
         on_write_ready(peer_sfd);
     } else if ((ev & EPOLLERR) || (ev & EPOLLHUP) || (ev & EPOLLRDHUP)) {
         on_disconnect(peer_sfd);
@@ -265,9 +266,13 @@ void EventIO::loop()
                 handle_event(peer_sfd, ev);
             }
 
+	    /* VP: This effectively means that it can handle only
+	       one client, because on_loop uses the fd which was
+	       passed in handle_data_received */
+	    /*
             if (!nev) {
                 on_loop();
-            }
+            } */
         } catch (...) {
         }
     }

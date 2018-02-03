@@ -17,17 +17,24 @@ void TCPServer::on_data_received(uint32_t sfd)
     std::cout << __func__ << "  sfd=" << sfd << std::endl;
 
     // This is a little different to the client because it connects if they are not the same
+    /* check if it is a listening fd or not */
     if (sfd != socket_fd()) {
-        uint16_t bytes = read_from_socket(sfd, buffer_.data(), buffer_.size());
+        int bytes = read_from_socket(sfd, buffer_.data(), buffer_.size());
         
         std::cout << "~" << __func__ << " " << bytes << " bytes" << std::endl;
 
         if (bytes > 0) {
+	    /* VP: successfully read */
             handle_data_received(sfd, buffer_.data(), bytes);
+	} else if (bytes == 0) {
+	    /* VP: connection is blocked, we will wait for next turn */
+            std::cout << __func__ << "Blocked: Client=" << sfd << std::endl;
         } else {
+	    /* fatal error or connection close */
             on_disconnect(sfd);
         }
     } else {
+	/* new connection arrived */
         std::cout << "\t  Accept Connection " << std::endl;
         accept_connection();
     }
