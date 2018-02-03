@@ -5,7 +5,7 @@ import re
 
 
 to_remove = ['lib/*', 'build/*']
-to_remove_pattern = ['.*cmake.*', 'makefile', '.*\.a$', '.*\.so']
+to_remove_pattern = ['.*cmake.*', 'makefile', '.*\.a$', '.*\.so', 'a.out']
 exceptions = ['CMakeLists.txt']
 
 cwd = os.getcwd()
