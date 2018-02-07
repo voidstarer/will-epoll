@@ -37,10 +37,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/networking/include)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(client
-    client.cpp
-)
-
 add_executable(server
     server.cpp
 )
@@ -52,7 +48,6 @@ add_executable(server
 #ENDIF(APPLE)
 
 
-target_link_libraries(client networking crypto pthread)
 target_link_libraries(server networking crypto pthread)
 
 #IF(APPLE)
