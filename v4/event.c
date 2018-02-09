@@ -26,6 +26,7 @@ extern void onDataReceived(struct _client *client, struct _packet *packet);
 extern void onDisconnect(struct _client *client);
 extern void onError(struct _client *client, int32_t error_code);
 extern void houseKeeping();
+extern int  should_i_quit();
 
 /*
  * Set the socket to non blocking 
@@ -518,7 +519,7 @@ do_poll(int port)
 
 	timeout = EPOLL_LOOP_TIMEOUT;
 	/* wait for events */
-	while(1) {
+	while(!should_i_quit()) {
 		log_debug("epoll_wait\n");
 		start_time = get_monotonic_time();
 		if ((events = epoll_wait(epoll_fd, cev, MAX_EVENTS, timeout*1000)) == -1) {

@@ -62,9 +62,11 @@ struct _client {
 	int32_t port;
 };
 
-//#define __str(a) #a
-//#define xstr(a) __str(a)
-#define xstr(a)
+enum {
+	PKT_HELLO=1,
+	PKT_DATA,
+	PKT_MAX
+};
 
 /* prototype */
 struct _client *new_client(int fd);
