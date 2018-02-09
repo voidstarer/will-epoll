@@ -72,7 +72,7 @@ static void run_client(const char *hostname, int32_t server_port, uint16_t clien
 	if (n < 0) {
 		error("ERROR writing to socket");
 	}
-//	sleep(1);
+	
 
 #if 0
 	bzero(buf, BUFSIZE);

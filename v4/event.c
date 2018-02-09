@@ -74,7 +74,7 @@ bind_port(int port)
 }
 
 static int
-register_read_fd(int fd, uint32_t events, void *data_ptr)
+register_event(int fd, int op, uint32_t events, void *data_ptr)
 {
 	struct epoll_event ev;
 
@@ -85,7 +85,7 @@ register_read_fd(int fd, uint32_t events, void *data_ptr)
 
 	log_debug(" fd: %d\n", fd);
 
-	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev) == -1 ) {
+	if (epoll_ctl(epoll_fd, op, fd, &ev) == -1 ) {
 		log_err(" epoll_ctl failed: %s\n", strerror(errno));
 		return -1;
 	}
@@ -97,7 +97,23 @@ static int
 register_read(struct _client *client)
 {
 	assert(client != NULL);
-	return register_read_fd(client->fd, EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, client);
+	log_info("called for id %d fd %d\n", client->id, client->fd);
+	return register_event(client->fd, EPOLL_CTL_ADD, EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, client);
+}
+
+static int
+register_write(struct _client *client)
+{
+	assert(client != NULL);
+	log_info("called for id %d fd %d\n", client->id, client->fd);
+	return register_event(client->fd, EPOLL_CTL_MOD, EPOLLOUT | EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, client);
+}
+
+static int
+unregister_write(struct _client *client)
+{
+	assert(client != NULL);
+	return register_event(client->fd, EPOLL_CTL_MOD, EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, client);
 }
 
 int
@@ -343,8 +359,44 @@ static void handle_read_event(void *ptr)
 	}
 }
 
+int
+send_data_to_client(uint16_t dst_id, struct _packet *packet)
+{
+	int rs;
+	struct _client *client;
+	struct _write_buffer *wbuf;
+	client = find_client_by_id(dst_id);
+	if(!client) {
+		log_err("client %hu not found\n", dst_id);
+		return -1;
+	}
+	wbuf = &client->write_buffer;
+	/* check if we have enough space to accomodate this message */
+	rs = GET_PACKET_LENGTH(packet)+wbuf->write_pending;
+	if (wbuf->total_size < rs) {
+		if(rs > MAX_ALLOWED_WRITE_QUEUE) {
+			log_err("Can't queue any more, write queue exceeds the given limit %d\n", MAX_ALLOWED_WRITE_QUEUE);
+			return -1;
+		}
+		log_debug("realloc write_buffer from %d to %d\n", wbuf->total_size, rs);
+		wbuf->buffer = realloc(wbuf->buffer, rs);
+		wbuf->total_size = rs;
+	}
+	memcpy(wbuf->buffer + wbuf->write_pending, packet, GET_PACKET_LENGTH(packet));
+	wbuf->write_pending = rs;
+	if(client->fd >= 0) {
+		/* if client is online, only then register the event */
+		register_write(client);
+	} else {
+		log_err("client %d is offline now\n", client->id);
+	}
+	return 0;
+}
+
 static void handle_write_event(void *ptr)
 {
+	int wc;
+	struct _write_buffer *wbuf;
 	struct _client *client = ptr;
 	assert(client != NULL);
 	if(client->invalid) {
@@ -352,8 +404,35 @@ static void handle_write_event(void *ptr)
 		log_err(" id: %u fd: %d is invalid\n", client->id, client->fd);
 		return;
 	}
+
 	log_info(" called for id: %u fd: %d\n", client->id, client->fd);
-	assert(NULL && " we should not reach here\n");
+
+	wbuf = &client->write_buffer;
+	log_debug("write_pending: %u\n", wbuf->write_pending);
+
+	/* we should be here only if we have something to write */
+	assert(wbuf->write_pending > 0);
+
+	wc = write(client->fd, wbuf->buffer, wbuf->write_pending);
+	if(wc > 0) {
+		/* subtract the data that was sent to client */
+		wbuf->write_pending -= wc;
+		if(wbuf->write_pending == 0) {
+			unregister_write(client);
+		} else {
+			memmove(wbuf->buffer, wbuf->buffer+wc, wbuf->write_pending);
+		}
+		return;
+	}
+	/* write should never return 0, so this is a case of -1 */
+	if(errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS) {
+		/* epoll will call us back */
+		return ;
+	}
+	onError(client, errno);
+	/* terrible error, free the client */
+	mark_client_as_invalid(client);
+	return;
 }
 
 
@@ -373,7 +452,7 @@ static void handle_event(const struct epoll_event *eptr)
 		handle_write_event(eptr->data.ptr);
 	} else {
 		/* we should never reach here */
-		assert(NULL && xstr(__func__) "we should never reach here");
+		assert(NULL && "we should never reach here");
 	}
 }
 
@@ -401,7 +480,7 @@ do_poll(int port)
 	}
 
 	/* listen_fd is explicitly registered with EPOLLIN only */
-	if(register_read_fd(listen_fd, EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, NULL) != 0) {
+	if(register_event(listen_fd, EPOLL_CTL_ADD, EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, NULL) != 0) {
 		log_err("failed to register listen fd\n");
 		exit(1);
 	}

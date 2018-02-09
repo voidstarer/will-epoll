@@ -93,3 +93,8 @@ add_new_client_to_array(struct _client *client, uint16_t id)
 	client->id = id;
 	/* here we have to chance to store the unset data from previous client */
 }
+
+struct _client *find_client_by_id(uint16_t id)
+{
+	return client_array[id];
+}

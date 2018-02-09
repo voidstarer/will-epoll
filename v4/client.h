@@ -37,6 +37,7 @@ struct __attribute__((__packed__)) _packet {
 
 
 #define MAX_PACKET_LENGTH (100 * 1024) /* 100 KB should be sufficient */
+#define MAX_ALLOWED_WRITE_QUEUE (10 * MAX_PACKET_LENGTH) /* max 10 maximized packets can be queued */
 
 struct _read_buffer {
 	uint32_t read_offset;
@@ -69,5 +70,8 @@ struct _client *new_client(int fd);
 void mark_client_as_invalid(struct _client *client);
 void add_new_client_to_array(struct _client *client, uint16_t id);
 void free_invalid_clients();
+struct _client *find_client_by_id(uint16_t id);
+int send_data_to_client(uint16_t dst_id, struct _packet *packet);
+
 
 #endif

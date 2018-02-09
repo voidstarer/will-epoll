@@ -15,6 +15,7 @@ void onDataReceived(struct _client *client, struct _packet *packet)
 {
 	fprintf(stdout, "id: %hu => %hu:: '%.*s'\n", client->id, GET_PACKET_DST_ID(packet),
 				(int)GET_PACKET_DATA_LENGTH(packet), packet->data);
+	send_data_to_client(GET_PACKET_DST_ID(packet), packet);
 }
 
 void onDisconnect(struct _client *client)
