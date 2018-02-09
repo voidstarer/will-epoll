@@ -37,7 +37,7 @@ struct __attribute__((__packed__)) _packet {
 
 
 #define MAX_PACKET_LENGTH (100 * 1024) /* 100 KB should be sufficient */
-#define MAX_ALLOWED_WRITE_QUEUE (10 * MAX_PACKET_LENGTH) /* max 10 maximized packets can be queued */
+#define MAX_ALLOWED_WRITE_QUEUE (50 * MAX_PACKET_LENGTH) /* max 50 maximized packets can be queued */
 
 struct _read_buffer {
 	uint32_t read_offset;
@@ -54,6 +54,7 @@ struct _write_buffer {
 struct _client {
 	uint16_t id;			/* client identifier */
 	uint8_t  invalid;		/* means that this connection is stale */
+	uint8_t  write_registered;	/* means the client is registered for write events */
 	uint32_t fd;			/* socket descriptor of the client */
 	struct _read_buffer read_buffer;
 	struct _write_buffer write_buffer;

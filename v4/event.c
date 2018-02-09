@@ -73,17 +73,27 @@ bind_port(int port)
 	return fd;
 }
 
+static char * get_events_string(char *buffer, int bufsize, uint32_t events) 
+{
+	snprintf(buffer, bufsize, "%s%s%s%s%s%s",
+		events & EPOLLIN?"EPOLLIN":"", events & EPOLLOUT?" EPOLLOUT":"",
+		events & EPOLLHUP?" EPOLLHUP":"", events & EPOLLRDHUP?" EPOLLRDHUP":"",
+		events & EPOLLERR?" EPOLLERR":"", events & EPOLLPRI?" EPOLLPRI":"");
+	return buffer;
+}
+
 static int
 register_event(int fd, int op, uint32_t events, void *data_ptr)
 {
 	struct epoll_event ev;
+	char buffer[1024];
 
 	assert(fd >= 0);
 	memset(&ev, 0, sizeof(ev));
 	ev.events = events;
 	ev.data.ptr = (void *)data_ptr;
 
-	log_debug(" fd: %d\n", fd);
+	log_debug(" fd: %d events: %s\n", fd, get_events_string(buffer, sizeof(buffer), events));
 
 	if (epoll_ctl(epoll_fd, op, fd, &ev) == -1 ) {
 		log_err(" epoll_ctl failed: %s\n", strerror(errno));
@@ -105,6 +115,10 @@ static int
 register_write(struct _client *client)
 {
 	assert(client != NULL);
+	if(client->write_registered) {
+		return 0;
+	}
+	client->write_registered = 1;
 	log_info("called for id %d fd %d\n", client->id, client->fd);
 	return register_event(client->fd, EPOLL_CTL_MOD, EPOLLOUT | EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, client);
 }
@@ -113,6 +127,11 @@ static int
 unregister_write(struct _client *client)
 {
 	assert(client != NULL);
+	if(client->write_registered == 0) {
+		return 0;
+	}
+	client->write_registered = 0;
+	log_info("called for id %d fd %d\n", client->id, client->fd);
 	return register_event(client->fd, EPOLL_CTL_MOD, EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, client);
 }
 
@@ -382,6 +401,8 @@ send_data_to_client(uint16_t dst_id, struct _packet *packet)
 		wbuf->buffer = realloc(wbuf->buffer, rs);
 		wbuf->total_size = rs;
 	}
+	log_debug("append %u bytes to write queue of id %hu, therefore, write_pending: %u\n",
+				GET_PACKET_LENGTH(packet), client->id, rs);
 	memcpy(wbuf->buffer + wbuf->write_pending, packet, GET_PACKET_LENGTH(packet));
 	wbuf->write_pending = rs;
 	if(client->fd >= 0) {
@@ -409,42 +430,52 @@ static void handle_write_event(void *ptr)
 
 	wbuf = &client->write_buffer;
 	log_debug("write_pending: %u\n", wbuf->write_pending);
-
-	/* we should be here only if we have something to write */
-	assert(wbuf->write_pending > 0);
-
-	wc = write(client->fd, wbuf->buffer, wbuf->write_pending);
-	if(wc > 0) {
-		/* subtract the data that was sent to client */
-		wbuf->write_pending -= wc;
-		if(wbuf->write_pending == 0) {
-			unregister_write(client);
-		} else {
-			memmove(wbuf->buffer, wbuf->buffer+wc, wbuf->write_pending);
-		}
+	if(wbuf->write_pending == 0) {
+		log_debug("id: %hu nothing more to write, will remove write registration\n", client->id);
+		unregister_write(client);
 		return;
 	}
-	/* write should never return 0, so this is a case of -1 */
-	if(errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS) {
-		/* epoll will call us back */
-		return ;
+
+	/* usually writes are slower than read, so let's loop it out, anyways the fd is non-blocking */
+	for(;;) {
+		wc = write(client->fd, wbuf->buffer, wbuf->write_pending);
+		if(wc > 0) {
+			/* subtract the data that was sent to client */
+			wbuf->write_pending -= wc;
+			log_debug("written %d bytes to id %d, pending: %d\n", wc, client->id, wbuf->write_pending);
+			if(wbuf->write_pending == 0) {
+				/* we can unregister_write here, but instead it's better that we take one more call
+				 * of EPOLLOUT and see if there is anything pending to write, because there are chances
+				 * that in this epoll loop some-one might add something to this client's queue */
+				//unregister_write(client);
+				break;
+			} else {
+				memmove(wbuf->buffer, wbuf->buffer+wc, wbuf->write_pending);
+			}
+		} else {
+			/* write should never return 0, so this is a case of -1 */
+			if(errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS) {
+				/* epoll will call us back */
+				log_info("write blocked for id %hu\n", client->id);
+				break;
+			}
+			log_info("write failed for id %hu: error: %s\n", client->id, strerror(errno));
+			onError(client, errno);
+			/* terrible error, free the client */
+			mark_client_as_invalid(client);
+			break;
+		}
 	}
-	onError(client, errno);
-	/* terrible error, free the client */
-	mark_client_as_invalid(client);
 	return;
 }
 
 
 static void handle_event(const struct epoll_event *eptr)
 {
+	char buffer[1024];
 	uint32_t ev = eptr->events; 
-	if (ev & EPOLLIN)    {log_info("EPOLLIN ");}
-	if (ev & EPOLLPRI)   {log_info("EPOLLPRI ");}
-	if (ev & EPOLLOUT)   {log_info("EPOLLOUT ");}
-	if (ev & EPOLLERR)   {log_info("EPOLLERR ");}
-	if (ev & EPOLLHUP)   {log_info("EPOLLHUP ");}
-	if (ev & EPOLLRDHUP) {log_info("EPOLLRDHUP ");}
+
+	log_debug("%s\n", get_events_string(buffer, sizeof(buffer), ev));
 
 	if (ev & (EPOLLIN|EPOLLERR|EPOLLHUP|EPOLLRDHUP)) {
 		handle_read_event(eptr->data.ptr);
