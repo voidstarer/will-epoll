@@ -72,9 +72,15 @@ static void run_client(const char *hostname, int32_t server_port, uint16_t clien
 	if (n < 0) {
 		error("ERROR writing to socket");
 	}
-	
-
 #if 0
+	if(i % 2 == 0) {
+		sleep(10);
+	}
+	if(i==3) {
+		printf("going for long sleep\n");
+		sleep(200);
+	}
+
 	bzero(buf, BUFSIZE);
 	n = read(sockfd, buf, BUFSIZE);
 	if (n < 0) 
