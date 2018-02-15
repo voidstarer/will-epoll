@@ -1,8 +1,9 @@
 #include <iostream>
 #include "tcp_server.hpp"
+#include "cmgr.hpp"
 
 
-void TCPServer::send_data_to_client(Packet *)
+void TCPServer::send_data_to_client(Packet *p)
 {
 }
 
