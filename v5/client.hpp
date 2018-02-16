@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include "unistd.h"
+#include "packet.hpp"
 
 #define MAX_CLIENTS (65536) /* 16 bit max */
 #define UNIDENTIFIED_CLIENT (MAX_CLIENTS-1)
@@ -22,6 +23,8 @@ public:
 	uint8_t write_buffer[MAX_ALLOWED_WRITE_QUEUE];
 	char ip[20];				/* ipv4 address in textual format */
 	int32_t port;
+	Packet * read_packet(int &);
+	bool queue_packet(Packet *);
 	Client(int fd) : 
 			id(UNIDENTIFIED_CLIENT), fd(fd),
 			invalid(false), write_registered(false),

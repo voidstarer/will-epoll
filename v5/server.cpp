@@ -16,13 +16,18 @@ private:
 	bool quit;
 
 public:
-	MyServer(uint16_t server_port=9000)
-		: TCPServer(server_port)
+	MyServer(uint16_t server_port=9000, int timeout_in_sec)
+		: TCPServer(server_port, int timeout_in_sec)
 	{}
 
-	void set_quit()
+	void ask_to_quit()
 	{
 		quit = true;
+	}
+
+	bool should_i_quit()
+	{
+		return quit;
 	}
 
 	void on_connect(Client *client)
@@ -68,12 +73,10 @@ public:
 
 	void run()
 	{
-		cout << "Running\n";
-		while(!quit) {
-			cout << "Calling parent do_poll\n";
-			do_poll();
-			sleep(1);
-		}
+		cout << "Initialize\n";
+		initialize();
+		cout << "Polling\n";
+		do_poll();
 		cout << "exit\n";
 	}
 
@@ -84,7 +87,7 @@ MyServer *server = NULL;
 static void signal_handler(int signo)
 {
 	
-	server->set_quit();
+	server->ask_to_quit();
 }
 
 static void usage(const char *name)
@@ -97,6 +100,7 @@ int main(int argc, char **argv)
 {
 	int optch;
 	int server_port=9000;
+	int timeout = 40; /* seconds */
 	int l=0;
 
 	while ((optch = getopt(argc, argv, "p:l:h")) != EOF) {
@@ -113,7 +117,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	server = new MyServer(server_port);
+	server = new MyServer(server_port, timeout);
 	signal(SIGINT, signal_handler);
 	server->run();
 	return(0);
