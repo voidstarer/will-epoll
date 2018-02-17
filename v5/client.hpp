@@ -44,12 +44,8 @@ public:
 			ip(), port(0), managed(false)
 	{ }
 
-	~Client()
-	{
-		if(fd >= 0) {
-			close(fd);
-		}
-	}
+	~Client();
+
 };
 
 #endif

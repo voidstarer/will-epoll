@@ -21,7 +21,7 @@ void ClientMgr::mark_client_as_invalid(Client *client)
 	if(!client) {
 		return;
 	}
-	log_info("marking client %hu fd  %d as invalid", client->id, client->fd);
+	log_info("marking client %hu fd  %d as invalid\n", client->id, client->fd);
 	client->invalid = true;
 	if(client->id != UNIDENTIFIED_CLIENT) {
 		/* also if it is assigned in the global array, then remove it from there also */

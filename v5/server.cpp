@@ -33,13 +33,17 @@ public:
 
 	void on_connect(Client *client)
 	{
-		cout << "Child on_connect called\n";
-		//cout << "Client connected from ip " << client->ip << "and port " << client->port <<" with fd " << client->fd << endl;
+		cout << __func__ << ": Client connected from ip " << client->ip << " and port " << client->port <<" with fd " << client->fd << endl;
+	}
+
+	void on_auth(Client *client)
+	{
+		cout << __func__ << ": Client " << client->id << " fd " << client->fd << " authenticated\n";
 	}
 
 	void on_disconnect(Client *client)
 	{
-		cout << "id " << client->id << " Disconnected\n";
+		cout << __func__ << ": id " << client->id << " Disconnected\n";
 	}
 
 	void on_data_received(Client *client, Packet *packet)
@@ -48,37 +52,41 @@ public:
 		switch(packet->type) {
 			case PKT_HELLO:
 				/* this is a hello packet sent by the client to identify itself */
-				cout << "id: " << client->id << " sent HELLO\n";
+				cout << __func__ << ": id: " << client->id << " sent HELLO\n";
 				break;
 			case PKT_DATA:
 				/* use this type to send data to another client */
-				cout << "src: " << client->id << " => dst " << packet->dst_id << ":: " << packet->to_string();
+				cout << __func__ << ": src: " << client->id << " => dst " << packet->dst_id << ":: " << packet->to_string() << "\n";
 				send_data_to_client(packet);
 				break;
 			default:
 				/* client sent an invalid packet */
-				cerr << "client " << client->id << " sent an invalid packet";
+				cerr << __func__ << ": client " << client->id << " sent an invalid packet\n";
 				break;
 		} 
 	}
 
 	void on_error(Client *client, int32_t error_code)
 	{
-		cout << "Error on id " << client->id << ": " << strerror(error_code) << "\n";
+		cout << __func__ << ": Error on id " << client->id << ": " << strerror(error_code) << "\n";
 	}
 
 	void house_keeping()
 	{
-		cout << "houseKeeping called\n";
+		cout << __func__ << ": houseKeeping called\n";
 	}
 
-	void run()
+	int run()
 	{
-		cout << "Initialize\n";
-		initialize();
-		cout << "Polling\n";
+		cout << __func__ << ": Initialize\n";
+		if(initialize() == false) {
+			cerr << __func__ << ": Failed to initialize server\n";
+			return(-1);
+		}
+		cout << __func__ << ": Polling\n";
 		do_poll();
-		cout << "exit\n";
+		cout << __func__ << ": Exit\n";
+		return(0);
 	}
 
 };
@@ -93,12 +101,13 @@ static void signal_handler(int signo)
 
 static void usage(const char *name)
 {
-	cerr << "usage: " << name << " [ -p <port>][ -l 0|1|2 ]\nDefault Port=2222.\nLoglevel: 0 - Error, 1 - Info, 2 - Debug\n";
+	cerr << "usage: " << name << " [ -p <port>][ -l 0|1|2 ]\nDefault Port=9000.\nLoglevel: 0 - Error, 1 - Info, 2 - Debug\n";
 	exit(1);
 }
 
 int main(int argc, char **argv)
 {
+	int ret;
 	int optch;
 	int server_port=9000;
 	int timeout = 40; /* seconds */
@@ -121,6 +130,6 @@ int main(int argc, char **argv)
 	set_log_level(l);
 	server = new MyServer(server_port, timeout);
 	signal(SIGINT, signal_handler);
-	server->run();
-	return(0);
+	ret = server->run();
+	return ret;
 }

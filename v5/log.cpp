@@ -23,5 +23,5 @@ void Logger::debug_log(const char *ident, const char *func, const char *fmt, ...
 	va_end(args1);
 	std::vsnprintf(buf.data(), buf.size(), fmt, args2);
 	va_end(args2);
-	std::printf("%s %s: %s: %s\n", ident, time_buf, func, buf.data());
+	std::printf("%s %s: %s: %s", ident, time_buf, func, buf.data());
 }

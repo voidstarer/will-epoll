@@ -38,6 +38,7 @@ public:
 	TCPServer(int p, int t) : server_port(p), loop_timeout(t), listen_fd(-1), epoll_fd(-1)
 	{ }
 	virtual void on_connect(Client *client) = 0;
+	virtual void on_auth(Client *client) = 0;
 	virtual void on_disconnect(Client *client) = 0;
 	virtual void on_data_received(Client *client, Packet *packet) = 0;
 	virtual void on_error(Client *client, int32_t error_code) = 0;

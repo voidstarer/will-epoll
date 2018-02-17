@@ -4,12 +4,21 @@
 #include "packet.hpp"
 #include "log.hpp"
 
+Client::~Client()
+{
+	log_info("Freeing client id %hu fd %d\n", id, fd);
+	if(fd >= 0) {
+		close(fd);
+	}
+}
+
 /* returns true if the entire header has been read */
 bool Client::read_n_bytes(uint32_t n, int &err)
 {
 	int rc;
 	rc = read(fd, read_buffer+read_offset, n);
 	if(rc == 0) {
+		log_info("id:%d fd:%d connection closed\n", id, fd);
 		/* connection closed */
 		err = ESHUTDOWN;
 		return false;
@@ -44,6 +53,7 @@ bool Client::read_header(int &err)
 	uint32_t remaining;
 	assert(read_offset < PACKET_HDR_LENGTH);
 	remaining = PACKET_HDR_LENGTH-read_offset;
+	log_debug("reading header\n");
 	return read_n_bytes(remaining, err);
 }
 
@@ -55,16 +65,22 @@ bool Client::read_body(int &err)
 {
 	uint32_t remaining;
 	assert(read_offset >= PACKET_HDR_LENGTH);
+	if(GET_PACKET_BODY_LENGTH(read_buffer) == 0) {
+		log_debug("body length is 0\n");
+		return true;
+	}
 	assert(GET_PACKET_LENGTH(read_buffer) <= MAX_PACKET_LENGTH);
 
 	remaining = GET_PACKET_LENGTH(read_buffer) - read_offset;
 	assert(remaining > 0);
+	log_debug("reading body\n");
 	return read_n_bytes(remaining, err);
 }
 
 bool Client::validate_packet(int &err)
 {
 	struct _packet *p = (struct _packet *) read_buffer;
+	log_debug("called\n");
 	/* convert from network order to host order here */
 	if(GET_PACKET_SRC_ID(p) == UNIDENTIFIED_CLIENT) {
 		/* the src id should always be known */
@@ -94,7 +110,7 @@ bool Client::validate_packet(int &err)
 			id = GET_PACKET_SRC_ID(p);
 			log_info("id: %hu sent HELLO. Packet consumed internally\n", id);
 			/* tell the caller that we have consumed this packet */
-			err = EAGAIN;
+			err = 0;
 			return false;
 			break;
 		case PKT_DATA:

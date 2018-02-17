@@ -203,6 +203,13 @@ void TCPServer::handle_read_event(void *ptr)
 		 */
 		on_data_received(client, P);
 		delete P;
+	} else if(ret == 0) {
+		/* we received a handshake packet,
+		   and the packed got consumed internally
+		   within the client*/
+		on_auth(client);
+		cmgr.manage(client);
+		log_info(" id: %hu: packet internally consumed\n", client->id);
 	} else {
 		if(ret == EAGAIN) {
 			/* epoll will bring us back */
@@ -216,7 +223,7 @@ void TCPServer::handle_read_event(void *ptr)
 			on_error(client, EINVAL);
 		} else if(ret == ESHUTDOWN) {
 			on_disconnect(client);
-			log_err(" id: %hu closed the connection\n", client->id);
+			log_info(" id: %hu closed the connection\n", client->id);
 		} else {
 			on_error(client, errno);
 			log_err(" id: %hu fd:%d read failed\n", client->id, client->fd);
@@ -291,7 +298,6 @@ bool TCPServer::initialize()
 		return false;
 	}
 
-	bind_port();
 	if(bind_port() == false) {
 		log_err("failed to create listen socket\n");
 		return false;
