@@ -1,3 +1,6 @@
+#include <cstring>
+#include <assert.h>
+#include "client.hpp"
 #include "packet.hpp"
 #include "log.hpp"
 
@@ -22,7 +25,7 @@ bool Client::read_n_bytes(uint32_t n, int &err)
 		return false;
 	}
 	read_offset += rc;
-	if(rc < n) {
+	if((uint32_t)rc < n) {
 		/* we have less than required data, need to retry */
 		err = EAGAIN;
 		return false;
@@ -65,7 +68,7 @@ bool Client::validate_packet(int &err)
 	/* convert from network order to host order here */
 	if(GET_PACKET_SRC_ID(p) == UNIDENTIFIED_CLIENT) {
 		/* the src id should always be known */
-		log_err("Client: %hu fd: %d sent src_id\n", client->id, client->fd);
+		log_err("Client: %hu fd: %d sent src_id\n", id, fd);
 		err = EINVAL;
 		return false;
 	}
@@ -82,7 +85,7 @@ bool Client::validate_packet(int &err)
 	}
 	log_info("received packet: type: %u src_id:%hu dst_id:%hu length: %lu\n",
 		GET_PACKET_TYPE(p), GET_PACKET_SRC_ID(p),
-		GET_PACKET_DST_ID(p), GET_PACKET_DATA_LENGTH(p));
+		GET_PACKET_DST_ID(p), GET_PACKET_BODY_LENGTH(p));
 
 	switch(GET_PACKET_TYPE(p)) {
 		case PKT_HELLO:
@@ -97,7 +100,7 @@ bool Client::validate_packet(int &err)
 		case PKT_DATA:
 			/* use this type to send data to another client */
 			log_info("id: %hu => %hu:: '%.*s'\n", id, GET_PACKET_DST_ID(p),
-				(int)GET_PACKET_DATA_LENGTH(p), packet->data);
+				(int)GET_PACKET_BODY_LENGTH(p), p->body);
 			err = 0;
 			break;
 		default:
@@ -182,7 +185,7 @@ bool Client::queue_packet(Packet *P)
  * Returns false in case of write failure
  *         true if write succeeds or connection blocks 
  */
-bool Client::write()
+bool Client::write_data()
 {
 	int wc;
 
@@ -192,7 +195,7 @@ bool Client::write()
 		if(wc > 0) {
 			/* subtract the data that was sent to client */
 			write_pending -= wc;
-			log_debug("written %d bytes to id %d, pending: %d\n", wc, client->id, write_pending);
+			log_debug("written %d bytes to id %d, pending: %d\n", wc, id, write_pending);
 			if(write_pending == 0) {
 				/* we can unregister_write here, but instead it's better that we take one more call
 				 * of EPOLLOUT and see if there is anything pending to write, because there are chances
@@ -217,3 +220,9 @@ bool Client::write()
 	return true;
 }
 
+bool Client::has_write_pending()
+{
+	if(write_pending)
+		return true;
+	return false;
+}

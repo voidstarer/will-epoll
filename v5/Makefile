@@ -1,5 +1,5 @@
 TARGET = server
-LDFLAGS = -lm
+LDFLAGS = 
 CC = gcc
 CXX = g++
 CFLAGS = -O0 -ggdb -Wall

@@ -1,7 +1,8 @@
+#include <assert.h>
 #include "cmgr.hpp"
 #include "log.hpp"
 
-void ClientMgr::~ClientMgr()
+ClientMgr::~ClientMgr()
 {
 	int i;
 	Client *client;
@@ -40,13 +41,17 @@ void ClientMgr::free_invalid_clients()
 	invalid_client_list.clear();
 }
 
-void ClientMgr::add_new_client_to_array(Client *client, uint16_t id)
+void ClientMgr::manage(Client *client)
 {
-	cout << " add id " << id << " fd " << client->fd;
-	mark_client_as_invalid(client_array[id]);
-	client_array[id] = client;
-	client->id = id;
+	if(client->managed) {
+		return;
+	}
+	assert(client->id != UNIDENTIFIED_CLIENT);
+	log_debug("manage client id: %hu fd: %d\n", client->id, client->fd);
 	/* here we have to chance to store the unset data from previous client */
+	mark_client_as_invalid(client_array[client->id]);
+	client_array[client->id] = client;
+	client->managed = true;
 }
 
 Client* ClientMgr::find_client_by_id(uint16_t id)

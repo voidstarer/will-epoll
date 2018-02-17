@@ -7,6 +7,7 @@
 #include "client.hpp"
 #include "packet.hpp"
 #include "tcp_server.hpp"
+#include "log.hpp"
 
 using namespace std;
 
@@ -16,8 +17,8 @@ private:
 	bool quit;
 
 public:
-	MyServer(uint16_t server_port=9000, int timeout_in_sec)
-		: TCPServer(server_port, int timeout_in_sec)
+	MyServer(int server_port, int timeout_in_sec)
+		: TCPServer(server_port, timeout_in_sec)
 	{}
 
 	void ask_to_quit()
@@ -117,6 +118,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+	set_log_level(l);
 	server = new MyServer(server_port, timeout);
 	signal(SIGINT, signal_handler);
 	server->run();

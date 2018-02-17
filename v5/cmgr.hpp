@@ -19,9 +19,10 @@ private:
 
 public:
 	ClientMgr():client_array(), invalid_client_list(){}
+	~ClientMgr();
 	void mark_client_as_invalid(Client *client);
 	void free_invalid_clients();
-	void add_new_client_to_array(Client *client, uint16_t id);
+	void manage(Client *client);
 	Client *find_client_by_id(uint16_t id);
 };
 #endif

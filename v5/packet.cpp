@@ -15,14 +15,14 @@ Packet::Packet(struct _packet *p)
 
 Packet::~Packet()
 {
-	if(data) {
-		free(data);
+	if(body) {
+		free(body);
 	}
 }
 
 const char *Packet::to_string()
 {
-	return (char*)data;
+	return (char*)body;
 }
 
 uint32_t Packet::get_serialized_length()

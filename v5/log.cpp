@@ -5,16 +5,12 @@
 #include <ctime>
 #include "log.hpp"
 
-Logger *Logger::s_instance = 0;
 /* Allocating and initializing Logger's static data member
  * The pointer is being allocated, not the object itself
  */
-void Logger::set_log_level(int level)
-{
-	log_level=level;
-}
+Logger *Logger::s_instance = 0;
 
-void Logger::debug_log(const char *ident, const char *fmt, ...)
+void Logger::debug_log(const char *ident, const char *func, const char *fmt, ...)
 {
 	std::time_t t = std::time(NULL);
 	char time_buf[100];
@@ -27,5 +23,5 @@ void Logger::debug_log(const char *ident, const char *fmt, ...)
 	va_end(args1);
 	std::vsnprintf(buf.data(), buf.size(), fmt, args2);
 	va_end(args2);
-	std::printf("%s %s : %s\n", ident, time_buf, buf.data());
+	std::printf("%s %s: %s: %s\n", ident, time_buf, func, buf.data());
 }

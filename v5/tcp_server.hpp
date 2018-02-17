@@ -19,24 +19,23 @@ private:
 	int listen_fd;
 	int epoll_fd;
 	int set_socket_nonblocking(int sock);
-	int bind_port();
-	void handle_event(const struct epoll_event *eptr);
-	void handle_write_event(void *ptr);
-	void handle_read_event(void *ptr);
-	int read_packets(Client *client);
-	int process_packets(Client *client);
-	int validate_packet(Client *client, Packet *packet);
-	time_t get_monotonic_time();
-	void ignore_sigpipe();
-	void accept_connection();
-	int unregister_read(Client *client);
-	int unregister_write(Client *client);
-	int register_write(Client *client);
-	int register_event(int fd, int op, uint32_t events, void *data_ptr);
+	bool bind_port();
 	char * get_events_string(char *buffer, int bufsize, uint32_t events);
+	bool register_event(int fd, int op, uint32_t events, void *data_ptr);
+	bool register_read(Client *client);
+	bool register_write(Client *client);
+	bool unregister_write(Client *client);
+	bool unregister_read(Client *client);
+	void accept_connection();
+	void ignore_sigpipe();
+	time_t get_monotonic_time();
+	int process_packet(Client *client, Packet *P);
+	void handle_read_event(void *ptr);
+	void handle_write_event(void *ptr);
+	void handle_event(const struct epoll_event *eptr);
 	ClientMgr cmgr;
 public:
-	TCPServer(uint16_t p, int t) : server_port(p), loop_timeout(t), listen_fd(-1), epoll_fd(-1)
+	TCPServer(int p, int t) : server_port(p), loop_timeout(t), listen_fd(-1), epoll_fd(-1)
 	{ }
 	virtual void on_connect(Client *client) = 0;
 	virtual void on_disconnect(Client *client) = 0;
@@ -45,8 +44,8 @@ public:
 	virtual void house_keeping() = 0;
 	virtual bool should_i_quit() = 0;
 
-	int do_poll();
-	int initialize();
+	void do_poll();
+	bool initialize();
 	bool send_data_to_client(Packet *);
 };
 

@@ -1,8 +1,12 @@
 #include <iostream>
+#include <cstring>
+#include <csignal>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <assert.h>
+
 
 #include "log.hpp"
 #include "tcp_server.hpp"
@@ -21,7 +25,7 @@ int TCPServer::set_socket_nonblocking(int sock)
 	return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 }
 
-int TCPServer:bind_port()
+bool TCPServer::bind_port()
 {
 	struct sockaddr_in addr;
 	int fd;
@@ -39,17 +43,17 @@ int TCPServer:bind_port()
 		log_err(" Unable to bind listening socket to port %d because of %s\n",
 				server_port, strerror(errno));
 		close(fd);
-		return -1;
+		return false;
 	}
 
 	if (listen(fd, 20) < 0) {
 		log_err("Unable to start listening socket because of %s\n", strerror(errno));
 		close(fd);
-		return -1;
+		return false;
 	}
 	set_socket_nonblocking(fd);
-
-	return fd;
+	listen_fd = fd;
+	return true;
 }
 
 char * TCPServer::get_events_string(char *buffer, int bufsize, uint32_t events) 
@@ -176,27 +180,6 @@ time_t TCPServer::get_monotonic_time()
 	return ts.tv_sec;
 }
 
-int TCPServer::process_packet(Client *client, Packet *P)
-{
-	assert(client->id != UNIDENTIFIED_CLIENT);
-	/* we have a good packet */
-	if(client->id == UNIDENTIFIED_CLIENT) {
-		/* the same client pointer will remain, the older one should be freed here */
-		add_new_client_to_array(client, GET_PACKET_SRC_ID(packet));
-	}
-
-	on_data_received(client, packet);
-	/* onDateReceived should consume the packet by duplicating it */
-	rbuf->read_offset -= packet_len;
-
-	if(rbuf->read_offset == 0) {
-		break;
-	}
-	memmove(rbuf->buffer, rbuf->buffer+packet_len, rbuf->read_offset); 
-	}
-	return EAGAIN;
-}
-
 void TCPServer::handle_read_event(void *ptr)
 {
 	Client *client = (Client*)ptr;
@@ -211,9 +194,15 @@ void TCPServer::handle_read_event(void *ptr)
 	}
 	log_info("id: %hu fd: %d\n", client->id, client->fd);
 
-	P = client->read_packet(&ret);
+	P = client->read_packet(ret);
 	if(P) {
-		process_packet(client, P);
+		cmgr.manage(client);
+		/* here I am assuming that on_data_received has copied the relevant data.
+		 * If you want to prevent copy, you can use this packet itself for
+		 * sending to destination, in that case, remove the delete here
+		 */
+		on_data_received(client, P);
+		delete P;
 	} else {
 		if(ret == EAGAIN) {
 			/* epoll will bring us back */
@@ -236,23 +225,20 @@ void TCPServer::handle_read_event(void *ptr)
 	}
 }
 
-bool
-TCPServer::send_data_to_client(Packet *P)
+bool TCPServer::send_data_to_client(Packet *P)
 {
-	uint32_t rs;
 	Client *client;
-	client = cmgr.find_client_by_id(dst_id);
+	client = cmgr.find_client_by_id(P->dst_id);
 	if(!client) {
-		log_err("client %hu not found\n", dst_id);
+		log_err("client %hu not found\n", P->dst_id);
 		return -1;
 	}
-	client->send_packet(P);
+	client->queue_packet(P);
 	return register_write(client);
 }
 
 void TCPServer::handle_write_event(void *ptr)
 {
-	int wc;
 	Client *client = (Client*)ptr;
 	assert(client != NULL);
 	if(client->invalid) {
@@ -263,14 +249,13 @@ void TCPServer::handle_write_event(void *ptr)
 
 	log_info("called for id: %u fd: %d\n", client->id, client->fd);
 
-	log_debug("write_pending: %u\n", client->write_pending);
-	if(client->write_pending == 0) {
+	if(client->has_write_pending() == false) {
 		log_debug("id: %hu nothing more to write, will remove write registration\n", client->id);
 		unregister_write(client);
 		return;
 	}
 
-	if(client->write() == false) {
+	if(client->write_data() == false) {
 		/* terrible error, free the client */
 		on_error(client, errno);
 		cmgr.mark_client_as_invalid(client);
@@ -306,8 +291,8 @@ bool TCPServer::initialize()
 		return false;
 	}
 
-	listen_fd = bind_port(server_port);
-	if(listen_fd < 0) {
+	bind_port();
+	if(bind_port() == false) {
 		log_err("failed to create listen socket\n");
 		return false;
 	}
@@ -322,7 +307,6 @@ bool TCPServer::initialize()
 
 void TCPServer::do_poll()
 {
-	int listen_fd;
 	int events, i;
 	int timeout; /* seconds */
 	struct epoll_event cev[MAX_EVENTS];
@@ -352,7 +336,7 @@ void TCPServer::do_poll()
 		end_time = get_monotonic_time();
 		timeout = timeout - (end_time - start_time);
 		if(timeout <= 0) {
-			houseKeeping();
+			house_keeping();
 			timeout = EPOLL_LOOP_TIMEOUT;
 		}
 	} /* end WHILE loop */

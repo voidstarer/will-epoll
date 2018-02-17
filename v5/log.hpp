@@ -9,25 +9,26 @@ enum {
 	DEBUG   /* debug-level message */
 };
 
-#define call_log(_id,_str, arg...)\
+#define call_log(_id, _str, arg...)\
 	do {\
-		Logger::instance()->debug_log(#_id, "%s : "_str, __FUNCTION__, ##arg);\
+		if(_id <= Logger::instance()->log_level) { Logger::instance()->debug_log(#_id, __FUNCTION__, _str, ##arg);}\
 	} while(0)
 
 #define log_info(_str, arg...)           call_log(INFO, _str, ##arg)
 #define log_err(_str, arg...)            call_log(ERROR, _str, ##arg)
 #define log_debug(_str, arg...)          call_log(DEBUG, _str, ##arg)
 
+#define set_log_level(_l)  Logger::instance()->log_level = (_l);
+
 class Logger {
 private:
-	int log_level;
 	static Logger *s_instance;
 	Logger() {
 		log_level = DEBUG;
 	}
 public:
-	void set_log_level(int level);
-	void debug_log(const char *ident, const char *fmt, ...);
+	int log_level;
+	void debug_log(const char *ident, const char *func, const char *fmt, ...) __attribute__((format(printf, 4, 5)));
 	static Logger *instance()
 	{
 		if(!s_instance)
