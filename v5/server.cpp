@@ -56,7 +56,7 @@ public:
 				break;
 			case PKT_DATA:
 				/* use this type to send data to another client */
-				cout << __func__ << ": src: " << client->id << " => dst " << packet->dst_id << ":: " << packet->to_string() << "\n";
+				//cout << __func__ << ": src: " << client->id << " => dst " << packet->dst_id << ":: " << packet->to_string() << "\n";
 				send_data_to_client(packet);
 				break;
 			default:

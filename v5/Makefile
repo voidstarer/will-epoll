@@ -21,6 +21,16 @@ HEADERS = $(wildcard *.hpp)
 $(TARGET): $(OBJECTS)
 	$(CXX) $(OBJECTS) -Wall $(LDFLAGS) -o $@
 
+test: CPPFLAGS+=-fprofile-arcs -ftest-coverage
+test: LDFLAGS+=-fprofile-arcs -ftest-coverage
+test: clean $(TARGET)
+	make -C test
+	rm -rf coverage
+	mkdir coverage
+	./test/unittest.sh
+	lcov --directory . --capture --output-file coverage/app.info
+	genhtml -o coverage coverage/app.info
+
 clean:
 	rm -f *.o
 	rm -f $(TARGET) 

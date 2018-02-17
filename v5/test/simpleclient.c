@@ -10,14 +10,22 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h> 
-#include "../client.h"
+#include "../packet.h"
+
+/* TODO: fix me */
+#define MAX_CLIENTS (65536) /* 16 bit max */
+#define UNIDENTIFIED_CLIENT (MAX_CLIENTS-1)
 
 #define BUFSIZE 1024
+
+static uint16_t client_id, dst_id;
+static char *server_addr;
+static int32_t server_port=9000;
 
 /* 
  * error - wrapper for perror
  */
-void error(char *msg) {
+static void error(char *msg) {
     perror(msg);
     exit(0);
 }
@@ -73,12 +81,12 @@ send_packet(int server_fd, uint16_t client_id, uint16_t dst_id, uint32_t type, c
 	SET_PACKET_TYPE(packet, type);
 	SET_PACKET_SRC_ID(packet, client_id);
 	SET_PACKET_DST_ID(packet, dst_id);
-	SET_PACKET_DATA_LENGTH(packet, n);
-	memcpy((void*)packet->data, data, n);
+	SET_PACKET_BODY_LENGTH(packet, n);
+	memcpy((void*)packet->body, data, n);
 
 	fprintf(stdout, "sending packet: type: %u src_id:%hu dst_id:%hu length: %lu total_length=%u\n",
 		GET_PACKET_TYPE(packet), GET_PACKET_SRC_ID(packet),
-		GET_PACKET_DST_ID(packet), GET_PACKET_DATA_LENGTH(packet), GET_PACKET_LENGTH(packet));
+		GET_PACKET_DST_ID(packet), GET_PACKET_BODY_LENGTH(packet), GET_PACKET_LENGTH(packet));
 	/* send the message line to the server */
 	n = write(server_fd, packet, GET_PACKET_LENGTH(packet));
 	if (n != GET_PACKET_LENGTH(packet)) {
@@ -93,11 +101,15 @@ send_hello(int server_fd, int client_id)
 	send_packet(server_fd, client_id, 0, PKT_HELLO, NULL);
 }
 
-static void send_invalid_packet(int server_fd, int client_id, int dst_id)
+static void send_invalid_packet_type(int server_fd, int client_id, int dst_id)
 {
 	send_packet(server_fd, client_id, dst_id, PKT_MAX, NULL);
 }
 
+static void send_invalid_src_id(int server_fd, int client_id, int dst_id)
+{
+	send_packet(server_fd, client_id+1, dst_id, PKT_MAX, NULL);
+}
 
 static void send_large_packet(int server_fd, int client_id, int dst_id)
 {
@@ -114,25 +126,27 @@ bombard_write(int server_fd, int client_id, int dst_id)
 	int n;
 	struct _packet *packet;
 	char buf[BUFSIZE];
-	int count=1000000;
+	//int count=1000000;
+	int count=100000;
 
 	for(int i=0; i<count; i++) {
 		packet = (struct _packet *)buf;
 		SET_PACKET_TYPE(packet, PKT_DATA);
 		SET_PACKET_SRC_ID(packet, client_id);
 		SET_PACKET_DST_ID(packet, dst_id);
-		n = snprintf((void*)packet->data, BUFSIZE-PACKET_HDR_LENGTH, "Hello %d from client %hu to %hu", i, client_id, dst_id);
-		SET_PACKET_DATA_LENGTH(packet, n);
+		n = snprintf((void*)packet->body, BUFSIZE-PACKET_HDR_LENGTH, "Hello %d from client %hu to %hu", i, client_id, dst_id);
+		SET_PACKET_BODY_LENGTH(packet, n);
 
 		fprintf(stdout, "sending packet: type: %u src_id:%hu dst_id:%hu length: %lu total_length=%u count=%d\n",
 			GET_PACKET_TYPE(packet), GET_PACKET_SRC_ID(packet),
-			GET_PACKET_DST_ID(packet), GET_PACKET_DATA_LENGTH(packet), GET_PACKET_LENGTH(packet), i);
+			GET_PACKET_DST_ID(packet), GET_PACKET_BODY_LENGTH(packet), GET_PACKET_LENGTH(packet), i);
 		/* send the message line to the server */
 		n = write(server_fd, packet, GET_PACKET_LENGTH(packet));
 		if (n != GET_PACKET_LENGTH(packet)) {
 			error("ERROR writing to socket");
 		}
 	}
+	sleep(5);
 	return;
 }
 
@@ -166,8 +180,8 @@ static void bombard_read(int server_fd)
 
 			fprintf(stdout, "type: %u src_id:%hu dst_id:%hu length: %lu total_length=%u msg=%.*s\n",
 				GET_PACKET_TYPE(packet), GET_PACKET_SRC_ID(packet),
-				GET_PACKET_DST_ID(packet), GET_PACKET_DATA_LENGTH(packet), GET_PACKET_LENGTH(packet),
-				(int)GET_PACKET_DATA_LENGTH(packet), (char*)packet->data);
+				GET_PACKET_DST_ID(packet), GET_PACKET_BODY_LENGTH(packet), GET_PACKET_LENGTH(packet),
+				(int)GET_PACKET_BODY_LENGTH(packet), (char*)packet->body);
 
 			rc -= GET_PACKET_LENGTH(packet);
 			memmove(buf, buf+GET_PACKET_LENGTH(packet), rc);
@@ -180,18 +194,54 @@ static void bombard_read(int server_fd)
 static void usage(const char *name)
 {
         fprintf(stderr, "usage: %s -s <server-addr> -i <client-id> -d <dest-client-id> [-r][ -p <port>]\n"\
-			"Default Port=2222\n-r is reader mode. Default is writer mode.\n", name);
+			"Default Port=9000\n-r is reader mode. Default is writer mode.\n", name);
         exit(1);
+}
+
+static void unittest_1()
+{
+	int server_fd = connect_to_server(server_addr, server_port);
+	send_hello(server_fd, client_id);
+	bombard_write(server_fd, client_id, dst_id);
+	close(server_fd);
+}
+
+static void unittest_2()
+{
+	int server_fd = connect_to_server(server_addr, server_port);
+	send_hello(server_fd, client_id);
+	send_invalid_packet_type(server_fd, client_id, dst_id);
+	close(server_fd);
+}
+
+static void unittest_3()
+{
+	int server_fd = connect_to_server(server_addr, server_port);
+	send_hello(server_fd, client_id);
+	send_large_packet(server_fd, client_id, dst_id);
+	close(server_fd);
+}
+
+static void unittest_4()
+{
+	int server_fd = connect_to_server(server_addr, server_port);
+	send_hello(server_fd, client_id);
+	send_invalid_src_id(server_fd, client_id, dst_id);
+	close(server_fd);
+}
+
+static void readtest()
+{
+	int server_fd = connect_to_server(server_addr, server_port);
+	send_hello(server_fd, client_id);
+	bombard_read(server_fd);
+	close(server_fd);
 }
 
 int main(int argc, char **argv)
 {
-	int server_fd;
 	int optch;
 	int reader_mode=0;
-	int32_t server_port=2222;
-	uint16_t client_id, dst_id;
-	const char *server_addr;
 
 	client_id = dst_id = UNIDENTIFIED_CLIENT;
 
@@ -222,18 +272,17 @@ int main(int argc, char **argv)
 		usage(argv[0]);
 	}
 
-	server_fd = connect_to_server(server_addr, server_port);
-	send_hello(server_fd, client_id);
 
 	if(reader_mode) {
-		bombard_read(server_fd);
+		readtest();
 	} else {
-		bombard_write(server_fd, client_id, dst_id);
+		unittest_1();
+		unittest_2();
+		unittest_3();
+		unittest_4();
 		/* to cover the invalid code */
 		/* wait for a while so that housekeeping gets covered */
-		sleep(40);
-		send_invalid_packet(server_fd, client_id, dst_id);
-		send_large_packet(server_fd, client_id, dst_id);
+		sleep(5);
 	}
         return(0);
 }
