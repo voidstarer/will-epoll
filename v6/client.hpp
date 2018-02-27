@@ -11,6 +11,11 @@
 #define MAX_PACKET_LENGTH (100 * 1024) /* 100 KB should be sufficient */
 #define MAX_ALLOWED_WRITE_QUEUE (50 * MAX_PACKET_LENGTH) /* max 50 maximized packets can be queued */
 
+typedef enum {
+	MODE_SERVER,
+	MODE_CLIENT
+} mode_type;
+
 class Client {
 private:
 	uint32_t read_offset;
@@ -31,6 +36,7 @@ public:
 	char ip[20];				/* ipv4 address in textual format */
 	int32_t port;
 	bool managed;
+	mode_type mode;				/* default mode is server */
 
 	bool has_write_pending();
 	Packet * read_packet(int &);
@@ -41,7 +47,7 @@ public:
 			read_offset(0), read_buffer(), write_pending(0), write_buffer(), 
 			id(UNIDENTIFIED_CLIENT), fd(fd),
 			invalid(false), write_registered(false),
-			ip(), port(0), managed(false)
+			ip(), port(0), managed(false), mode(MODE_SERVER)
 	{ }
 
 	~Client();

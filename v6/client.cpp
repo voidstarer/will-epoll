@@ -26,14 +26,17 @@ bool Client::read_n_bytes(uint32_t n, int &err)
 	if(rc < 0) {
 		if(errno == EINTR || errno == EAGAIN || errno == EINPROGRESS) {
 			/* we will get called again from EPOLL */
+			log_info("id:%d fd:%d read blocked\n", id, fd);
 			err = EAGAIN;
 		} else {
 			/* read sets this errno to indicate the error */
+			log_info("id:%d fd:%d read error: %s\n", id, fd, strerror(errno));
 			err = errno;
 		}
 		return false;
 	}
 	read_offset += rc;
+	log_info("id:%d fd:%d %d bytes read, read_offset = %d\n", id, fd, rc, read_offset);
 	if((uint32_t)rc < n) {
 		/* we have less than required data, need to retry */
 		err = EAGAIN;
@@ -81,22 +84,24 @@ bool Client::validate_packet(int &err)
 {
 	struct _packet *p = (struct _packet *) read_buffer;
 	log_debug("called\n");
-	/* convert from network order to host order here */
-	if(GET_PACKET_SRC_ID(p) == UNIDENTIFIED_CLIENT) {
-		/* the src id should always be known */
-		log_err("Client: %hu fd: %d sent src_id\n", id, fd);
-		err = EINVAL;
-		return false;
-	}
-	if(id == UNIDENTIFIED_CLIENT) {
-		/* this is the first packet and we should mark our id with it */
-		id = GET_PACKET_SRC_ID(p);
-	} else {
-		/* src_id should always match our id */
-		if(GET_PACKET_SRC_ID(p) != id) {
+	if(mode == MODE_SERVER) {
+		/* convert from network order to host order here */
+		if(GET_PACKET_SRC_ID(p) == UNIDENTIFIED_CLIENT) {
+			/* the src id should always be known */
+			log_err("Client: %hu fd: %d sent src_id\n", id, fd);
 			err = EINVAL;
-			log_err("id: %hu sent an invalid src_id: %hu\n", id, GET_PACKET_SRC_ID(p));
 			return false;
+		}
+		if(id == UNIDENTIFIED_CLIENT) {
+			/* this is the first packet and we should mark our id with it */
+			id = GET_PACKET_SRC_ID(p);
+		} else {
+			/* src_id should always match our id */
+			if(GET_PACKET_SRC_ID(p) != id) {
+				err = EINVAL;
+				log_err("id: %hu sent an invalid src_id: %hu\n", id, GET_PACKET_SRC_ID(p));
+				return false;
+			}
 		}
 	}
 	log_info("received packet: type: %u src_id:%hu dst_id:%hu length: %lu\n",

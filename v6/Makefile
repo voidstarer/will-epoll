@@ -20,10 +20,10 @@ HEADERS = $(wildcard *.hpp)
 .PRECIOUS: $(TARGET) $(OBJECTS) tcp_server.o my_server.o
 
 server: $(OBJECTS) tcp_server.o my_server.o
-	$(CXX) $? -Wall $(LDFLAGS) -o $@
+	$(CXX) $^ -Wall $(LDFLAGS) -o $@
 
 client: $(OBJECTS) tcp_client.o my_client.o
-	$(CXX) $? -Wall $(LDFLAGS) -o $@
+	$(CXX) $^ -Wall $(LDFLAGS) -o $@
 
 test: CPPFLAGS+=-fprofile-arcs -ftest-coverage
 test: LDFLAGS+=-fprofile-arcs -ftest-coverage

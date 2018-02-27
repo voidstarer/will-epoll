@@ -17,8 +17,8 @@ private:
 	bool quit;
 
 public:
-	MyClient(const char *ip, int server_port, int timeout_in_sec)
-		: TCPClient(ip, server_port, timeout_in_sec)
+	MyClient(const char *ip, int server_port, int timeout_in_sec, uint16_t id)
+		: TCPClient(ip, server_port, timeout_in_sec, id)
 	{}
 
 	void ask_to_quit()
@@ -33,17 +33,17 @@ public:
 
 	void on_connect(Client *client)
 	{
-		cout << __func__ << ": Client connected from ip " << client->ip << " and port " << client->port <<" with fd " << client->fd << endl;
+		cout << __func__ << ": Client connected to server " << client->ip << " and port " << client->port <<" with fd " << client->fd << endl;
 	}
 
 	void on_auth(Client *client)
 	{
-		cout << __func__ << ": Client " << client->id << " fd " << client->fd << " authenticated\n";
+		cout << __func__ << ": Client authenticated\n";
 	}
 
 	void on_disconnect(Client *client)
 	{
-		cout << __func__ << ": id " << client->id << " Disconnected\n";
+		cout << __func__ << ": Server Disconnected\n";
 	}
 
 	void on_data_received(Client *client, Packet *packet)
@@ -52,23 +52,22 @@ public:
 		switch(packet->type) {
 			case PKT_HELLO:
 				/* this is a hello packet sent by the client to identify itself */
-				cout << __func__ << ": id: " << client->id << " sent HELLO\n";
+				cout << __func__ << ": server sent HELLO\n";
 				break;
 			case PKT_DATA:
 				/* use this type to send data to another client */
-				//cout << __func__ << ": src: " << client->id << " => dst " << packet->dst_id << ":: " << packet->to_string() << "\n";
-				send_data_to_client(packet);
+				cout << __func__ << ": src: " << packet->src_id << " => dst " << packet->dst_id << ":: " << packet->to_string() << "\n";
 				break;
 			default:
 				/* client sent an invalid packet */
-				cerr << __func__ << ": client " << client->id << " sent an invalid packet\n";
+				cerr << __func__ << ": received an invalid packet\n";
 				break;
 		} 
 	}
 
 	void on_error(Client *client, int32_t error_code)
 	{
-		cout << __func__ << ": Error on id " << client->id << ": " << strerror(error_code) << "\n";
+		cout << __func__ << ": Error on Connection : " << strerror(error_code) << "\n";
 	}
 
 	void house_keeping()
@@ -101,7 +100,7 @@ static void signal_handler(int signo)
 
 static void usage(const char *name)
 {
-	cerr << "usage: " << name << " -i <server-ip> [ -p <port>][ -l 0|1|2 ]\nDefault Port=9000.\nLoglevel: 0 - Error, 1 - Info, 2 - Debug\n";
+	cerr << "usage: " << name << " -s <server-ip> -i <src_id> -d <dst_id> [ -p <port>][ -l 0|1|2 ]\nDefault Port=9000.\nLoglevel: 0 - Error, 1 - Info, 2 - Debug\n";
 	exit(1);
 }
 
@@ -112,9 +111,11 @@ int main(int argc, char **argv)
 	int server_port=9000;
 	int timeout = 40; /* seconds */
 	int l=0;
+	uint16_t src_id, dst_id;
 	const char *server_ip = NULL;
 
-	while ((optch = getopt(argc, argv, "p:i:l:h")) != EOF) {
+	src_id = dst_id = UNIDENTIFIED_CLIENT;
+	while ((optch = getopt(argc, argv, "p:l:i:d:s:h")) != EOF) {
 		switch(optch) {
 			case 'p':
 				server_port = atoi(optarg);
@@ -123,6 +124,12 @@ int main(int argc, char **argv)
 				l = atoi(optarg);
 				break;
 			case 'i':
+				src_id = atoi(optarg);
+				break;
+			case 'd':
+				dst_id = atoi(optarg);
+				break;
+			case 's':
 				server_ip = optarg;
 				break;
 			case 'h':
@@ -135,7 +142,7 @@ int main(int argc, char **argv)
 	}
 
 	set_log_level(l);
-	client = new MyClient(server_ip, server_port, timeout);
+	client = new MyClient(server_ip, server_port, timeout, src_id);
 	signal(SIGINT, signal_handler);
 	ret = client->run();
 	return ret;

@@ -9,12 +9,24 @@
 #include "cmgr.hpp"
 #include "event.hpp"
 
+typedef enum {
+	DISCONNECTED,
+	CONNECTING,
+	CONNECTED
+} server_state;
+
 class TCPClient : public Event
 { 
 private:
 	char server_ip[20];
 	int server_port;
 	int loop_timeout;
+	int server_fd;
+	server_state state;
+	uint16_t id;
+	Client *me;
+	bool connect_to_server();
+	bool check_connect(uint32_t events, int fd);
 	bool register_read(Client *client);
 	bool register_write(Client *client);
 	bool unregister_write(Client *client);
@@ -25,8 +37,12 @@ private:
 	void handle_read_event(void *ptr);
 	void handle_write_event(void *ptr);
 	void handle_event(const struct epoll_event *eptr);
+	void handle_initial_state(const struct epoll_event *eptr);
+	void disconnect();
+	void send_packet(packet_type type, uint16_t dst_id, const uint8_t *data, uint32_t data_len);
+	void send_hello();
 public:
-	TCPClient(const char *ip, int p, int t) : Event(), server_port(p), loop_timeout(t)
+	TCPClient(const char *ip, int p, int t, uint16_t id) : Event(), server_port(p), loop_timeout(t), server_fd(-1), state(DISCONNECTED), id(id)
 	{
 		snprintf(server_ip, sizeof(server_ip), "%s", ip);
 	}
@@ -40,7 +56,7 @@ public:
 
 	void do_poll();
 	bool initialize();
-	bool send_data_to_client(Packet *);
+	bool send_data_to_server(Packet *);
 };
 
 #endif

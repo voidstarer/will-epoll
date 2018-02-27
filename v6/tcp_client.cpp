@@ -73,11 +73,7 @@ void TCPClient::handle_read_event(void *ptr)
 	int ret;
 
 	assert(client != NULL);
-	if(client->invalid) {
-		/* this is a stale client */
-		log_err(" id: %u fd: %d is invalid\n", client->id, client->fd);
-		return;
-	}
+	assert(client->invalid == false);
 	log_info("id: %hu fd: %d\n", client->id, client->fd);
 
 	P = client->read_packet(ret);
@@ -92,7 +88,6 @@ void TCPClient::handle_read_event(void *ptr)
 		/* we received a handshake packet,
 		   and the packed got consumed internally
 		   within the client*/
-		on_auth(client);
 		log_info(" id: %hu: packet internally consumed\n", client->id);
 	} else {
 		if(ret == EAGAIN) {
@@ -100,7 +95,7 @@ void TCPClient::handle_read_event(void *ptr)
 			log_info(" id: %hu returning back to epoll\n", client->id);
 			return;
 		} else if(ret == EMSGSIZE) {
-			log_err( " id: %hu sent a large message\n", client->id);
+			log_err( " received a large message\n");
 			on_error(client, EMSGSIZE);
 		} else if(ret == EINVAL) {
 			log_err( " id: %hu sent an invalid message\n", client->id);
@@ -112,16 +107,14 @@ void TCPClient::handle_read_event(void *ptr)
 			on_error(client, errno);
 			log_err(" id: %hu fd:%d read failed\n", client->id, client->fd);
 		}
+		disconnect();
 	}
 }
 
-bool TCPClient::send_data_to_client(Packet *P)
+bool TCPClient::send_data_to_server(Packet *P)
 {
-	Client *client = NULL;
-	if(!client) {
-		log_err("client %hu not found\n", P->dst_id);
-		return -1;
-	}
+	Client *client = me;
+	assert(me != NULL);
 	client->queue_packet(P);
 	return register_write(client);
 }
@@ -170,9 +163,103 @@ void TCPClient::handle_event(const struct epoll_event *eptr)
 	}
 }
 
-bool connect_to_server()
+bool TCPClient::check_connect(uint32_t events, int fd)
 {
-	return false;
+	uint32_t error=0, len=sizeof(error);
+
+	if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+		log_err("getsockopt(%d) failed '%s'\n", fd, strerror(errno));
+		return false;
+	}
+	if (error) {
+		log_err("connect(%s:%d) failed '%s'\n", server_ip, server_port, strerror(error));
+		return false;
+	}
+	return true;
+}
+
+void TCPClient::disconnect()
+{
+	log_info("called\n");
+	assert(state != DISCONNECTED);
+	on_disconnect(NULL);
+	close(server_fd);
+	server_fd = -1;
+	state=DISCONNECTED;
+	delete me;
+	me = NULL;
+}
+
+void TCPClient::send_packet(packet_type type, uint16_t dst_id, const uint8_t *data, uint32_t data_len)
+{
+	Packet *P;
+	P = new Packet(type, id, dst_id, data, data_len);
+	send_data_to_server(P);
+	delete P;
+}
+
+
+void TCPClient::send_hello()
+{
+	send_packet(PKT_HELLO, 0, NULL, 0);
+}
+
+void TCPClient::handle_initial_state(const struct epoll_event *eptr)
+{
+	switch(state) {
+		case CONNECTING:
+			if(check_connect(eptr->events, server_fd) == false) {
+				disconnect();
+				return;
+			}
+			log_info("connected successfully to server %s:%d. Next step: handshake\n", server_ip, server_port);
+			state = CONNECTED;
+			me = new Client(server_fd);
+			me->id = id;
+			strcpy(me->ip, server_ip);
+			me->port = server_port;
+			me->mode = MODE_CLIENT;
+			on_connect(me);
+			send_hello();
+			break;
+		case CONNECTED:
+		case DISCONNECTED:
+		default:
+			log_err("invalid state %d", state);
+			assert(NULL && "we should never reach here");
+			break;
+	};
+}
+
+bool TCPClient::connect_to_server()
+{
+	struct sockaddr_in sin;
+	int fd;
+
+	log_info("%s:%d\n", server_ip, server_port);
+	assert(state == DISCONNECTED);
+	if(inet_pton(AF_INET, server_ip, &(sin.sin_addr)) <= 0) {
+		log_err("invalid addr %s\n", server_ip);
+		return false;
+	}
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(server_port);
+
+	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		log_err("socket() failed '%s'\n", strerror(errno));
+		return false;
+	}
+	set_socket_nonblocking(fd);
+	if (connect(fd, (struct sockaddr*)&sin, sizeof(struct sockaddr_in)) < 0) {
+		if ((errno != EAGAIN) && (errno != EINPROGRESS)) {
+			log_err("connect(%s:%d) failed '%s'\n", server_ip, server_port, strerror(errno));
+			close(fd);
+			return false;
+		}
+	}
+	state = CONNECTING;
+	server_fd = fd;
+	return register_event(fd, EPOLL_CTL_ADD, EPOLLOUT | EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, NULL);
 }
 
 bool TCPClient::initialize()
@@ -184,7 +271,7 @@ bool TCPClient::initialize()
 	}
 
 	if(connect_to_server() == false) {
-		log_err("failed to create listen socket\n");
+		log_err("failed to connect to server\n");
 		return false;
 	}
 
@@ -209,9 +296,10 @@ void TCPClient::do_poll()
 			log_debug("Got %d events on rfd\n", events);
 			for (i = 0; i < events; i++) {
 				if(cev[i].data.ptr == NULL) {
-					/* this is listen fd */
+					/* this is server fd before the connection/handshake */
+					handle_initial_state(&cev[i]);
 				} else {
-					/* this is client fd */
+					/* this is other fd */
 					handle_event(&cev[i]);
 				}
 			} /* end FOR loop */
@@ -220,6 +308,10 @@ void TCPClient::do_poll()
 		end_time = get_monotonic_time();
 		timeout = timeout - (end_time - start_time);
 		if(timeout <= 0) {
+			if(state == DISCONNECTED) {
+				/* retry connection */
+				connect_to_server();
+			}
 			house_keeping();
 			timeout = EPOLL_LOOP_TIMEOUT;
 		}

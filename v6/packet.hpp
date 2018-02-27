@@ -13,6 +13,7 @@ public:
 	uint8_t *body;
 	
 	Packet(struct _packet *p);
+	Packet(packet_type t, uint16_t s, uint16_t d, const uint8_t *b, uint32_t bl);
 
 	~Packet();
 

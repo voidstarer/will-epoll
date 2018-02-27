@@ -5,6 +5,7 @@
 
 bool Event::initialize()
 {
+	log_info("called\n");
 	/* create a new epoll */
 	if ((epoll_fd = epoll_create(MAX_EVENTS)) == -1) { 
 		log_err("epoll_create: failed: %s\n", strerror(errno));
