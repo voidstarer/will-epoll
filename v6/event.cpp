@@ -1,4 +1,5 @@
 #include <cstring>
+#include <fcntl.h>
 #include "event.hpp"
 #include "log.hpp"
 
@@ -16,13 +17,25 @@ bool Event::register_event(int fd, int op, uint32_t events, void *data_ptr)
 {
 	struct epoll_event ev;
 	char buffer[1024];
+	const char *opstr;
 
 	assert(fd >= 0);
 	memset(&ev, 0, sizeof(ev));
 	ev.events = events;
 	ev.data.ptr = (void *)data_ptr;
 
-	log_debug(" fd: %d events: %s\n", fd, get_events_string(buffer, sizeof(buffer), events));
+	if(op == EPOLL_CTL_ADD) {
+		opstr = "ADD";
+	} else if(op == EPOLL_CTL_MOD) {
+		opstr = "MODIFY";
+	} else if(op == EPOLL_CTL_DEL) {
+		opstr = "DEL";
+	} else {
+		opstr = "UNKNOWN";
+	}
+
+	log_debug(" fd: %d op=%s events: %s\n", fd, opstr,
+		get_events_string(buffer, sizeof(buffer), events));
 
 	if (epoll_ctl(epoll_fd, op, fd, &ev) == -1 ) {
 		log_err(" epoll_ctl failed: %s\n", strerror(errno));
@@ -40,5 +53,15 @@ char * Event::get_events_string(char *buffer, int bufsize, uint32_t events)
 	return buffer;
 }
 
+/*
+ * Set the socket to non blocking 
+ */
+int Event::set_socket_nonblocking(int sock)
+{
+	int flags;
 
+	assert(sock >= 0);
 
+	flags = fcntl(sock, F_GETFL, 0);
+	return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+}

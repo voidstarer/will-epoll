@@ -19,6 +19,7 @@ protected:
 	bool initialize();
 	char * get_events_string(char *buffer, int bufsize, uint32_t events);
 	bool register_event(int fd, int op, uint32_t events, void *data_ptr);
+	int set_socket_nonblocking(int sock);
 
 public:
 	Event() : epoll_fd(-1)

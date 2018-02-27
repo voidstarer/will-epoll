@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2018-02-27 14:24:20</td>
+            <td class="headerValue">2018-02-27 14:49:31</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntry">4</td>
@@ -87,19 +87,19 @@
 <span class="lineNum">      25 </span><span class="lineNoCov">          0 :         return (char*)body;</span>
 <a name="26"><span class="lineNum">      26 </span>            : }</a>
 <span class="lineNum">      27 </span>            : 
-<span class="lineNum">      28 </span><span class="lineCov">     200000 : uint32_t Packet::get_serialized_length()</span>
+<span class="lineNum">      28 </span><span class="lineCov">     199998 : uint32_t Packet::get_serialized_length()</span>
 <span class="lineNum">      29 </span>            : {
-<span class="lineNum">      30 </span><span class="lineCov">     200000 :         return PACKET_HDR_LENGTH+body_length;</span>
+<span class="lineNum">      30 </span><span class="lineCov">     199998 :         return PACKET_HDR_LENGTH+body_length;</span>
 <a name="31"><span class="lineNum">      31 </span>            : }</a>
 <span class="lineNum">      32 </span>            : 
-<span class="lineNum">      33 </span><span class="lineCov">     100000 : void Packet::serialize(uint8_t *buffer)</span>
+<span class="lineNum">      33 </span><span class="lineCov">      99999 : void Packet::serialize(uint8_t *buffer)</span>
 <span class="lineNum">      34 </span>            : {
-<span class="lineNum">      35 </span><span class="lineCov">     100000 :         SET_PACKET_SRC_ID(buffer, src_id)</span>
-<span class="lineNum">      36 </span><span class="lineCov">     100000 :         SET_PACKET_DST_ID(buffer, dst_id)</span>
-<span class="lineNum">      37 </span><span class="lineCov">     100000 :         SET_PACKET_TYPE(buffer, type);</span>
-<span class="lineNum">      38 </span><span class="lineCov">     100000 :         SET_PACKET_BODY_LENGTH(buffer, body_length);</span>
-<span class="lineNum">      39 </span><span class="lineCov">     100000 :         memcpy(((struct _packet *)buffer)-&gt;body, body, body_length);</span>
-<span class="lineNum">      40 </span><span class="lineCov">     100000 : }</span>
+<span class="lineNum">      35 </span><span class="lineCov">      99999 :         SET_PACKET_SRC_ID(buffer, src_id)</span>
+<span class="lineNum">      36 </span><span class="lineCov">      99999 :         SET_PACKET_DST_ID(buffer, dst_id)</span>
+<span class="lineNum">      37 </span><span class="lineCov">      99999 :         SET_PACKET_TYPE(buffer, type);</span>
+<span class="lineNum">      38 </span><span class="lineCov">      99999 :         SET_PACKET_BODY_LENGTH(buffer, body_length);</span>
+<span class="lineNum">      39 </span><span class="lineCov">      99999 :         memcpy(((struct _packet *)buffer)-&gt;body, body, body_length);</span>
+<span class="lineNum">      40 </span><span class="lineCov">      99999 : }</span>
 </pre>
       </td>
     </tr>

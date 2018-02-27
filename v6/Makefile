@@ -1,4 +1,4 @@
-TARGET = server
+TARGET = server client
 LDFLAGS = 
 CC = gcc
 CXX = g++
@@ -10,16 +10,20 @@ CPPFLAGS = $(CFLAGS) -std=gnu++11
 default: $(TARGET) 
 all: default
 
-OBJECTS = $(patsubst %.cpp, %.o, $(wildcard *.cpp))
+#OBJECTS = $(patsubst %.cpp, %.o, $(wildcard *.cpp))
+OBJECTS = client.o event.o cmgr.o packet.o log.o
 HEADERS = $(wildcard *.hpp)
 
 %.o: %.cpp $(HEADERS)
 	$(CXX) $(CPPFLAGS) -c $< -o $@
 
-.PRECIOUS: $(TARGET) $(OBJECTS)
+.PRECIOUS: $(TARGET) $(OBJECTS) tcp_server.o server.o
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(OBJECTS) -Wall $(LDFLAGS) -o $@
+server: $(OBJECTS) tcp_server.o server.o
+	$(CXX) $? -Wall $(LDFLAGS) -o $@
+
+client: $(OBJECTS) tcp_client.o my_client.o
+	$(CXX) $? -Wall $(LDFLAGS) -o $@
 
 test: CPPFLAGS+=-fprofile-arcs -ftest-coverage
 test: LDFLAGS+=-fprofile-arcs -ftest-coverage

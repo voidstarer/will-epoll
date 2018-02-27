@@ -6,50 +6,17 @@
 #include <unistd.h>
 #include <assert.h>
 
-
 #include "log.hpp"
-#include "tcp_server.hpp"
-#include "cmgr.hpp"
+#include "tcp_client.hpp"
 
-bool TCPServer::bind_port()
-{
-	struct sockaddr_in addr;
-	int fd;
-	const int on = 1;
-
-	fd = socket(AF_INET, SOCK_STREAM, 0);
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(server_port);
-	addr.sin_addr.s_addr = inet_addr("0.0.0.0");
-
-	if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-		log_err(" Unable to bind listening socket to port %d because of %s\n",
-				server_port, strerror(errno));
-		close(fd);
-		return false;
-	}
-
-	if (listen(fd, 20) < 0) {
-		log_err("Unable to start listening socket because of %s\n", strerror(errno));
-		close(fd);
-		return false;
-	}
-	set_socket_nonblocking(fd);
-	listen_fd = fd;
-	return true;
-}
-
-bool TCPServer::register_read(Client *client)
+bool TCPClient::register_read(Client *client)
 {
 	assert(client != NULL);
 	log_info("called for id %d fd %d\n", client->id, client->fd);
 	return register_event(client->fd, EPOLL_CTL_ADD, EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, client);
 }
 
-bool TCPServer::register_write(Client *client)
+bool TCPClient::register_write(Client *client)
 {
 	assert(client != NULL);
 	if(client->write_registered == true) {
@@ -60,7 +27,7 @@ bool TCPServer::register_write(Client *client)
 	return register_event(client->fd, EPOLL_CTL_MOD, EPOLLOUT | EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, client);
 }
 
-bool TCPServer::unregister_write(Client *client)
+bool TCPClient::unregister_write(Client *client)
 {
 	assert(client != NULL);
 	if(client->write_registered == false) {
@@ -71,7 +38,7 @@ bool TCPServer::unregister_write(Client *client)
 	return register_event(client->fd, EPOLL_CTL_MOD, EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, client);
 }
 
-bool TCPServer::unregister_read(Client *client)
+bool TCPClient::unregister_read(Client *client)
 {
 	assert(client != NULL);
 
@@ -80,34 +47,7 @@ bool TCPServer::unregister_read(Client *client)
 	return register_event(client->fd, EPOLL_CTL_DEL, 0, NULL);
 }
 
-
-void TCPServer::accept_connection()
-{
-	int newfd;
-	socklen_t size;
-	struct sockaddr_in cl;
-	Client *client;
-
-	size = sizeof(struct sockaddr_in);
-	newfd = accept(listen_fd, (struct sockaddr *)&cl, &size);
-	if (newfd < 0) {
-		log_err("accept() failed: %s\n", strerror(errno));
-		return;
-	}
-
-	set_socket_nonblocking(newfd);
-	client = new Client(newfd);
-	inet_ntop(AF_INET, &cl.sin_addr, client->ip, sizeof(client->ip));
-	client->port = ntohs(cl.sin_port);
-
-	/* onConnect */
-	on_connect(client);
-	register_read(client);
-	return;
-}
-
-
-void TCPServer::ignore_sigpipe()
+void TCPClient::ignore_sigpipe()
 {
 	struct sigaction ac;
 	/* ignore sigpipe, let write get fail */
@@ -117,7 +57,7 @@ void TCPServer::ignore_sigpipe()
 	sigaction(SIGPIPE, &ac, NULL);
 }
 
-time_t TCPServer::get_monotonic_time()
+time_t TCPClient::get_monotonic_time()
 {
 	struct timespec ts;
 	if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
@@ -126,7 +66,7 @@ time_t TCPServer::get_monotonic_time()
 	return ts.tv_sec;
 }
 
-void TCPServer::handle_read_event(void *ptr)
+void TCPClient::handle_read_event(void *ptr)
 {
 	Client *client = (Client*)ptr;
 	Packet *P;
@@ -142,7 +82,6 @@ void TCPServer::handle_read_event(void *ptr)
 
 	P = client->read_packet(ret);
 	if(P) {
-		cmgr.manage(client);
 		/* here I am assuming that on_data_received has copied the relevant data.
 		 * If you want to prevent copy, you can use this packet itself for
 		 * sending to destination, in that case, remove the delete here
@@ -154,7 +93,6 @@ void TCPServer::handle_read_event(void *ptr)
 		   and the packed got consumed internally
 		   within the client*/
 		on_auth(client);
-		cmgr.manage(client);
 		log_info(" id: %hu: packet internally consumed\n", client->id);
 	} else {
 		if(ret == EAGAIN) {
@@ -174,14 +112,12 @@ void TCPServer::handle_read_event(void *ptr)
 			on_error(client, errno);
 			log_err(" id: %hu fd:%d read failed\n", client->id, client->fd);
 		}
-		cmgr.mark_client_as_invalid(client);
 	}
 }
 
-bool TCPServer::send_data_to_client(Packet *P)
+bool TCPClient::send_data_to_client(Packet *P)
 {
-	Client *client;
-	client = cmgr.find_client_by_id(P->dst_id);
+	Client *client = NULL;
 	if(!client) {
 		log_err("client %hu not found\n", P->dst_id);
 		return -1;
@@ -190,7 +126,7 @@ bool TCPServer::send_data_to_client(Packet *P)
 	return register_write(client);
 }
 
-void TCPServer::handle_write_event(void *ptr)
+void TCPClient::handle_write_event(void *ptr)
 {
 	Client *client = (Client*)ptr;
 	assert(client != NULL);
@@ -211,14 +147,13 @@ void TCPServer::handle_write_event(void *ptr)
 	if(client->write_data() == false) {
 		/* terrible error, free the client */
 		on_error(client, errno);
-		cmgr.mark_client_as_invalid(client);
 	}
 
 	return;
 }
 
 
-void TCPServer::handle_event(const struct epoll_event *eptr)
+void TCPClient::handle_event(const struct epoll_event *eptr)
 {
 	char buffer[1024];
 	uint32_t ev = eptr->events; 
@@ -235,7 +170,12 @@ void TCPServer::handle_event(const struct epoll_event *eptr)
 	}
 }
 
-bool TCPServer::initialize()
+bool connect_to_server()
+{
+	return false;
+}
+
+bool TCPClient::initialize()
 {
 	ignore_sigpipe();
 
@@ -243,20 +183,15 @@ bool TCPServer::initialize()
 		return false;
 	}
 
-	if(bind_port() == false) {
+	if(connect_to_server() == false) {
 		log_err("failed to create listen socket\n");
 		return false;
 	}
 
-	/* listen_fd is explicitly registered with EPOLLIN only */
-	if(register_event(listen_fd, EPOLL_CTL_ADD, EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLRDHUP, NULL) == false) {
-		log_err("failed to register listen fd\n");
-		return false;
-	}
 	return true;
 }
 
-void TCPServer::do_poll()
+void TCPClient::do_poll()
 {
 	int events, i;
 	int timeout; /* seconds */
@@ -275,14 +210,12 @@ void TCPServer::do_poll()
 			for (i = 0; i < events; i++) {
 				if(cev[i].data.ptr == NULL) {
 					/* this is listen fd */
-					accept_connection();
 				} else {
 					/* this is client fd */
 					handle_event(&cev[i]);
 				}
 			} /* end FOR loop */
 		}
-		cmgr.free_invalid_clients();
 		/* rework timeout */
 		end_time = get_monotonic_time();
 		timeout = timeout - (end_time - start_time);

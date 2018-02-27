@@ -9,28 +9,27 @@
 #include "cmgr.hpp"
 #include "event.hpp"
 
-class TCPServer : public Event
+class TCPClient : public Event
 { 
 private:
+	char server_ip[20];
 	int server_port;
 	int loop_timeout;
-	int listen_fd;
-	bool bind_port();
 	bool register_read(Client *client);
 	bool register_write(Client *client);
 	bool unregister_write(Client *client);
 	bool unregister_read(Client *client);
-	void accept_connection();
 	void ignore_sigpipe();
 	time_t get_monotonic_time();
 	int process_packet(Client *client, Packet *P);
 	void handle_read_event(void *ptr);
 	void handle_write_event(void *ptr);
 	void handle_event(const struct epoll_event *eptr);
-	ClientMgr cmgr;
 public:
-	TCPServer(int p, int t) : Event(), server_port(p), loop_timeout(t), listen_fd(-1)
-	{ }
+	TCPClient(const char *ip, int p, int t) : Event(), server_port(p), loop_timeout(t)
+	{
+		snprintf(server_ip, sizeof(server_ip), "%s", ip);
+	}
 	virtual void on_connect(Client *client) = 0;
 	virtual void on_auth(Client *client) = 0;
 	virtual void on_disconnect(Client *client) = 0;
