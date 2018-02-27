@@ -1,0 +1,320 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - app.info - v6/client.cpp</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">v6</a> - client.cpp<span style="font-size: 80%;"> (source / <a href="client.cpp.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">app.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">91</td>
+            <td class="headerCovTableEntry">110</td>
+            <td class="headerCovTableEntryMed">82.7 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2018-02-27 14:24:20</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : #include &lt;cstring&gt;</a>
+<span class="lineNum">       2 </span>            : #include &lt;assert.h&gt;
+<span class="lineNum">       3 </span>            : #include &quot;client.hpp&quot;
+<span class="lineNum">       4 </span>            : #include &quot;packet.hpp&quot;
+<a name="5"><span class="lineNum">       5 </span>            : #include &quot;log.hpp&quot;</a>
+<span class="lineNum">       6 </span>            : 
+<span class="lineNum">       7 </span><span class="lineCov">          8 : Client::~Client()</span>
+<span class="lineNum">       8 </span>            : {
+<span class="lineNum">       9 </span><span class="lineCov">          4 :         log_info(&quot;Freeing client id %hu fd %d\n&quot;, id, fd);</span>
+<span class="lineNum">      10 </span><span class="lineCov">          4 :         if(fd &gt;= 0) {</span>
+<span class="lineNum">      11 </span><span class="lineCov">          4 :                 close(fd);</span>
+<span class="lineNum">      12 </span>            :         }
+<span class="lineNum">      13 </span><span class="lineCov">          4 : }</span>
+<a name="14"><span class="lineNum">      14 </span>            : </a>
+<span class="lineNum">      15 </span>            : /* returns true if the entire header has been read */
+<span class="lineNum">      16 </span><span class="lineCov">     200009 : bool Client::read_n_bytes(uint32_t n, int &amp;err)</span>
+<span class="lineNum">      17 </span>            : {
+<span class="lineNum">      18 </span>            :         int rc;
+<span class="lineNum">      19 </span><span class="lineCov">     200009 :         rc = read(fd, read_buffer+read_offset, n);</span>
+<span class="lineNum">      20 </span><span class="lineCov">     200009 :         if(rc == 0) {</span>
+<span class="lineNum">      21 </span><span class="lineCov">          1 :                 log_info(&quot;id:%d fd:%d connection closed\n&quot;, id, fd);</span>
+<span class="lineNum">      22 </span>            :                 /* connection closed */
+<span class="lineNum">      23 </span><span class="lineCov">          1 :                 err = ESHUTDOWN;</span>
+<span class="lineNum">      24 </span><span class="lineCov">          1 :                 return false;</span>
+<span class="lineNum">      25 </span>            :         }
+<span class="lineNum">      26 </span><span class="lineCov">     200008 :         if(rc &lt; 0) {</span>
+<span class="lineNum">      27 </span><span class="lineNoCov">          0 :                 if(errno == EINTR || errno == EAGAIN || errno == EINPROGRESS) {</span>
+<span class="lineNum">      28 </span>            :                         /* we will get called again from EPOLL */
+<span class="lineNum">      29 </span><span class="lineNoCov">          0 :                         err = EAGAIN;</span>
+<span class="lineNum">      30 </span>            :                 } else {
+<span class="lineNum">      31 </span>            :                         /* read sets this errno to indicate the error */
+<span class="lineNum">      32 </span><span class="lineNoCov">          0 :                         err = errno;</span>
+<span class="lineNum">      33 </span>            :                 }
+<span class="lineNum">      34 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">      35 </span>            :         }
+<span class="lineNum">      36 </span><span class="lineCov">     200008 :         read_offset += rc;</span>
+<span class="lineNum">      37 </span><span class="lineCov">     200008 :         if((uint32_t)rc &lt; n) {</span>
+<span class="lineNum">      38 </span>            :                 /* we have less than required data, need to retry */
+<span class="lineNum">      39 </span><span class="lineNoCov">          0 :                 err = EAGAIN;</span>
+<span class="lineNum">      40 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">      41 </span>            :         }
+<span class="lineNum">      42 </span>            :         /* we have the required data */
+<span class="lineNum">      43 </span><span class="lineCov">     200008 :         err = 0;</span>
+<span class="lineNum">      44 </span><span class="lineCov">     200008 :         return true;</span>
+<span class="lineNum">      45 </span>            : }
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span>            : /* returns true : if the entire header is read
+<span class="lineNum">      48 </span>            :  *         false: if less data was read, or connection was blocked or if an error was encountered
+<a name="49"><span class="lineNum">      49 </span>            :  *                In case of false, it sets the err appropriately</a>
+<span class="lineNum">      50 </span>            :  */
+<span class="lineNum">      51 </span><span class="lineCov">     100009 : bool Client::read_header(int &amp;err)</span>
+<span class="lineNum">      52 </span>            : {
+<span class="lineNum">      53 </span>            :         uint32_t remaining;
+<span class="lineNum">      54 </span><span class="lineCov">     100009 :         assert(read_offset &lt; PACKET_HDR_LENGTH);</span>
+<span class="lineNum">      55 </span><span class="lineCov">     100009 :         remaining = PACKET_HDR_LENGTH-read_offset;</span>
+<span class="lineNum">      56 </span><span class="lineCov">     100009 :         log_debug(&quot;reading header\n&quot;);</span>
+<span class="lineNum">      57 </span><span class="lineCov">     100009 :         return read_n_bytes(remaining, err);</span>
+<span class="lineNum">      58 </span>            : }
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span>            : /* returns true : if the entire body is read
+<span class="lineNum">      61 </span>            :  *         false: if less data was read, or connection was blocked or if an error was encountered
+<a name="62"><span class="lineNum">      62 </span>            :  *                In case of false, it sets the err appropriately</a>
+<span class="lineNum">      63 </span>            :  */
+<span class="lineNum">      64 </span><span class="lineCov">     100007 : bool Client::read_body(int &amp;err)</span>
+<span class="lineNum">      65 </span>            : {
+<span class="lineNum">      66 </span>            :         uint32_t remaining;
+<span class="lineNum">      67 </span><span class="lineCov">     100007 :         assert(read_offset &gt;= PACKET_HDR_LENGTH);</span>
+<span class="lineNum">      68 </span><span class="lineCov">     100007 :         if(GET_PACKET_BODY_LENGTH(read_buffer) == 0) {</span>
+<span class="lineNum">      69 </span><span class="lineCov">          7 :                 log_debug(&quot;body length is 0\n&quot;);</span>
+<span class="lineNum">      70 </span><span class="lineCov">          7 :                 return true;</span>
+<span class="lineNum">      71 </span>            :         }
+<span class="lineNum">      72 </span><span class="lineCov">     100000 :         assert(GET_PACKET_LENGTH(read_buffer) &lt;= MAX_PACKET_LENGTH);</span>
+<span class="lineNum">      73 </span>            : 
+<span class="lineNum">      74 </span><span class="lineCov">     100000 :         remaining = GET_PACKET_LENGTH(read_buffer) - read_offset;</span>
+<span class="lineNum">      75 </span><span class="lineCov">     100000 :         assert(remaining &gt; 0);</span>
+<span class="lineNum">      76 </span><span class="lineCov">     100000 :         log_debug(&quot;reading body\n&quot;);</span>
+<span class="lineNum">      77 </span><span class="lineCov">     100000 :         return read_n_bytes(remaining, err);</span>
+<a name="78"><span class="lineNum">      78 </span>            : }</a>
+<span class="lineNum">      79 </span>            : 
+<span class="lineNum">      80 </span><span class="lineCov">     100007 : bool Client::validate_packet(int &amp;err)</span>
+<span class="lineNum">      81 </span>            : {
+<span class="lineNum">      82 </span><span class="lineCov">     100007 :         struct _packet *p = (struct _packet *) read_buffer;</span>
+<span class="lineNum">      83 </span><span class="lineCov">     100007 :         log_debug(&quot;called\n&quot;);</span>
+<span class="lineNum">      84 </span>            :         /* convert from network order to host order here */
+<span class="lineNum">      85 </span><span class="lineCov">     100007 :         if(GET_PACKET_SRC_ID(p) == UNIDENTIFIED_CLIENT) {</span>
+<span class="lineNum">      86 </span>            :                 /* the src id should always be known */
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :                 log_err(&quot;Client: %hu fd: %d sent src_id\n&quot;, id, fd);</span>
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :                 err = EINVAL;</span>
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">      90 </span>            :         }
+<span class="lineNum">      91 </span><span class="lineCov">     100007 :         if(id == UNIDENTIFIED_CLIENT) {</span>
+<span class="lineNum">      92 </span>            :                 /* this is the first packet and we should mark our id with it */
+<span class="lineNum">      93 </span><span class="lineCov">          5 :                 id = GET_PACKET_SRC_ID(p);</span>
+<span class="lineNum">      94 </span>            :         } else {
+<span class="lineNum">      95 </span>            :                 /* src_id should always match our id */
+<span class="lineNum">      96 </span><span class="lineCov">     100002 :                 if(GET_PACKET_SRC_ID(p) != id) {</span>
+<span class="lineNum">      97 </span><span class="lineCov">          1 :                         err = EINVAL;</span>
+<span class="lineNum">      98 </span><span class="lineCov">          1 :                         log_err(&quot;id: %hu sent an invalid src_id: %hu\n&quot;, id, GET_PACKET_SRC_ID(p));</span>
+<span class="lineNum">      99 </span><span class="lineCov">          1 :                         return false;</span>
+<span class="lineNum">     100 </span>            :                 }
+<span class="lineNum">     101 </span>            :         }
+<span class="lineNum">     102 </span><span class="lineCov">     100006 :         log_info(&quot;received packet: type: %u src_id:%hu dst_id:%hu length: %lu\n&quot;,</span>
+<span class="lineNum">     103 </span>            :                 GET_PACKET_TYPE(p), GET_PACKET_SRC_ID(p),
+<span class="lineNum">     104 </span>            :                 GET_PACKET_DST_ID(p), GET_PACKET_BODY_LENGTH(p));
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span><span class="lineCov">     100006 :         switch(GET_PACKET_TYPE(p)) {</span>
+<span class="lineNum">     107 </span>            :                 case PKT_HELLO:
+<span class="lineNum">     108 </span>            :                         /* this is a hello packet sent by the client to identify itself */
+<span class="lineNum">     109 </span>            :                         /* control packets like HELLO should be consumed here itself */
+<span class="lineNum">     110 </span><span class="lineCov">          5 :                         id = GET_PACKET_SRC_ID(p);</span>
+<span class="lineNum">     111 </span><span class="lineCov">          5 :                         log_info(&quot;id: %hu sent HELLO. Packet consumed internally\n&quot;, id);</span>
+<span class="lineNum">     112 </span>            :                         /* tell the caller that we have consumed this packet */
+<span class="lineNum">     113 </span><span class="lineCov">          5 :                         err = 0;</span>
+<span class="lineNum">     114 </span><span class="lineCov">          5 :                         return false;</span>
+<span class="lineNum">     115 </span>            :                         break;
+<span class="lineNum">     116 </span>            :                 case PKT_DATA:
+<span class="lineNum">     117 </span>            :                         /* use this type to send data to another client */
+<span class="lineNum">     118 </span><span class="lineCov">     100000 :                         log_info(&quot;id: %hu =&gt; %hu:: '%.*s'\n&quot;, id, GET_PACKET_DST_ID(p),</span>
+<span class="lineNum">     119 </span>            :                                 (int)GET_PACKET_BODY_LENGTH(p), p-&gt;body);
+<span class="lineNum">     120 </span><span class="lineCov">     100000 :                         err = 0;</span>
+<span class="lineNum">     121 </span><span class="lineCov">     100000 :                         break;</span>
+<span class="lineNum">     122 </span>            :                 default:
+<span class="lineNum">     123 </span>            :                         /* client sent an invalid packet */
+<span class="lineNum">     124 </span><span class="lineCov">          1 :                         log_err(&quot;id: %hu sent an invalid packet\n&quot;, id);</span>
+<span class="lineNum">     125 </span><span class="lineCov">          1 :                         err = EINVAL;</span>
+<span class="lineNum">     126 </span><span class="lineCov">          1 :                         return false;</span>
+<span class="lineNum">     127 </span>            :                         break;
+<span class="lineNum">     128 </span>            :         }
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span><span class="lineCov">     100000 :         return true;</span>
+<a name="131"><span class="lineNum">     131 </span>            : }</a>
+<span class="lineNum">     132 </span>            : 
+<span class="lineNum">     133 </span><span class="lineCov">     100007 : void Client::reset_read_buffer()</span>
+<span class="lineNum">     134 </span>            : {
+<span class="lineNum">     135 </span><span class="lineCov">     100007 :         read_offset = 0;</span>
+<span class="lineNum">     136 </span><span class="lineCov">     100007 : }</span>
+<span class="lineNum">     137 </span>            : 
+<span class="lineNum">     138 </span>            : 
+<span class="lineNum">     139 </span>            : /* returns new Packet in case of a valid packet received
+<span class="lineNum">     140 </span>            :  * returns NULL and sets the err to following:
+<span class="lineNum">     141 </span>            :  *        ESHUTDOWN: in case of connection closed
+<span class="lineNum">     142 </span>            :  *        EMSGSIZE: in case client sent an unexpectely large packet
+<span class="lineNum">     143 </span>            :  *        EINVAL: in case of invalid packet sent by client
+<span class="lineNum">     144 </span>            :  *        0 in the case of a packet read successfully
+<span class="lineNum">     145 </span>            :  *        EAGAIN in the case of partial packet read or connection blocked (EINTR, EAGAIN, EINPROGRESS or EWOULDBLOCK)
+<a name="146"><span class="lineNum">     146 </span>            :  *        EAGAIN is also set in the case of an internal packet type like HELLO packet</a>
+<span class="lineNum">     147 </span>            : */
+<span class="lineNum">     148 </span><span class="lineCov">     100009 : Packet* Client::read_packet(int &amp;err)</span>
+<span class="lineNum">     149 </span>            : {
+<span class="lineNum">     150 </span>            :         Packet *P;
+<span class="lineNum">     151 </span><span class="lineCov">     100009 :         if(read_offset &lt; PACKET_HDR_LENGTH) {</span>
+<span class="lineNum">     152 </span>            :                 /* get the header first */
+<span class="lineNum">     153 </span><span class="lineCov">     100009 :                 if(read_header(err) == false)  {</span>
+<span class="lineNum">     154 </span><span class="lineCov">          1 :                         return NULL;</span>
+<span class="lineNum">     155 </span>            :                 }
+<span class="lineNum">     156 </span><span class="lineCov">     100008 :                 if(GET_PACKET_LENGTH(read_buffer) &gt; MAX_PACKET_LENGTH) {</span>
+<span class="lineNum">     157 </span><span class="lineCov">          1 :                         err = EMSGSIZE;</span>
+<span class="lineNum">     158 </span><span class="lineCov">          1 :                         return NULL;</span>
+<span class="lineNum">     159 </span>            :                 }
+<span class="lineNum">     160 </span>            :         }
+<span class="lineNum">     161 </span><span class="lineCov">     100007 :         if(read_body(err) == false) {</span>
+<span class="lineNum">     162 </span><span class="lineNoCov">          0 :                 return NULL;</span>
+<span class="lineNum">     163 </span>            :         }
+<span class="lineNum">     164 </span>            :         /* here we have received a full packet, therefore,
+<span class="lineNum">     165 </span>            :          * below this, we should always reset the read_buffer before return
+<span class="lineNum">     166 </span>            :          */
+<span class="lineNum">     167 </span><span class="lineCov">     100007 :         if(validate_packet(err) == false) {</span>
+<span class="lineNum">     168 </span><span class="lineCov">          7 :                 reset_read_buffer();</span>
+<span class="lineNum">     169 </span><span class="lineCov">          7 :                 return NULL;</span>
+<span class="lineNum">     170 </span>            :         }
+<span class="lineNum">     171 </span>            : 
+<span class="lineNum">     172 </span>            :         /* create a new Packet and return that */
+<span class="lineNum">     173 </span><span class="lineCov">     100000 :         P = new Packet((struct _packet *)read_buffer);</span>
+<span class="lineNum">     174 </span><span class="lineCov">     100000 :         reset_read_buffer();</span>
+<span class="lineNum">     175 </span><span class="lineCov">     100000 :         return P;</span>
+<span class="lineNum">     176 </span>            : }
+<span class="lineNum">     177 </span>            : 
+<span class="lineNum">     178 </span>            : /*
+<span class="lineNum">     179 </span>            :  * Returns false: if packet could not be queued
+<a name="180"><span class="lineNum">     180 </span>            :  *         true : if the packet was queueud</a>
+<span class="lineNum">     181 </span>            :  */
+<span class="lineNum">     182 </span><span class="lineCov">     100000 : bool Client::queue_packet(Packet *P)</span>
+<span class="lineNum">     183 </span>            : {
+<span class="lineNum">     184 </span>            :         uint32_t rs;
+<span class="lineNum">     185 </span>            : 
+<span class="lineNum">     186 </span>            :         /* get required size */
+<span class="lineNum">     187 </span><span class="lineCov">     100000 :         rs = P-&gt;get_serialized_length() + write_pending;</span>
+<span class="lineNum">     188 </span><span class="lineCov">     100000 :         if(rs &gt; MAX_ALLOWED_WRITE_QUEUE) {</span>
+<span class="lineNum">     189 </span><span class="lineNoCov">          0 :                 log_err(&quot;Can't queue any more, write queue exceeds the given limit %d\n&quot;, MAX_ALLOWED_WRITE_QUEUE);</span>
+<span class="lineNum">     190 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">     191 </span>            :         }
+<span class="lineNum">     192 </span><span class="lineCov">     100000 :         P-&gt;serialize(write_buffer+write_pending);</span>
+<span class="lineNum">     193 </span><span class="lineCov">     100000 :         write_pending += P-&gt;get_serialized_length();</span>
+<span class="lineNum">     194 </span><span class="lineCov">     100000 :         log_debug(&quot;append %u bytes to write queue of id %hu, therefore, write_pending: %u\n&quot;,</span>
+<span class="lineNum">     195 </span>            :                                 P-&gt;get_serialized_length(), id, write_pending);
+<span class="lineNum">     196 </span>            : 
+<span class="lineNum">     197 </span><span class="lineCov">     100000 :         return true;</span>
+<span class="lineNum">     198 </span>            : }
+<span class="lineNum">     199 </span>            : 
+<span class="lineNum">     200 </span>            : /*
+<span class="lineNum">     201 </span>            :  * Returns false in case of write failure
+<a name="202"><span class="lineNum">     202 </span>            :  *         true if write succeeds or connection blocks </a>
+<span class="lineNum">     203 </span>            :  */
+<span class="lineNum">     204 </span><span class="lineCov">      99999 : bool Client::write_data()</span>
+<span class="lineNum">     205 </span>            : {
+<span class="lineNum">     206 </span>            :         int wc;
+<span class="lineNum">     207 </span>            : 
+<span class="lineNum">     208 </span>            :         /* usually writes are slower than read, so let's loop it out, anyways the fd is non-blocking */
+<span class="lineNum">     209 </span><span class="lineNoCov">          0 :         for(;;) {</span>
+<span class="lineNum">     210 </span><span class="lineCov">      99999 :                 wc = write(fd, write_buffer, write_pending);</span>
+<span class="lineNum">     211 </span><span class="lineCov">      99999 :                 if(wc &gt; 0) {</span>
+<span class="lineNum">     212 </span>            :                         /* subtract the data that was sent to client */
+<span class="lineNum">     213 </span><span class="lineCov">      99999 :                         write_pending -= wc;</span>
+<span class="lineNum">     214 </span><span class="lineCov">      99999 :                         log_debug(&quot;written %d bytes to id %d, pending: %d\n&quot;, wc, id, write_pending);</span>
+<span class="lineNum">     215 </span><span class="lineCov">      99999 :                         if(write_pending == 0) {</span>
+<span class="lineNum">     216 </span>            :                                 /* we can unregister_write here, but instead it's better that we take one more call
+<span class="lineNum">     217 </span>            :                                  * of EPOLLOUT and see if there is anything pending to write, because there are chances
+<span class="lineNum">     218 </span>            :                                  * that in this epoll loop some-one might add something to this client's queue */
+<span class="lineNum">     219 </span><span class="lineCov">      99999 :                                 break;</span>
+<span class="lineNum">     220 </span>            :                         } else {
+<span class="lineNum">     221 </span>            :                                 /* this will get rarely called */
+<span class="lineNum">     222 </span><span class="lineNoCov">          0 :                                 memmove(write_buffer, write_buffer+wc, write_pending);</span>
+<span class="lineNum">     223 </span>            :                         }
+<span class="lineNum">     224 </span>            :                 } else {
+<span class="lineNum">     225 </span>            :                         /* write should never return 0, so this is a case of -1 */
+<span class="lineNum">     226 </span><span class="lineNoCov">          0 :                         if(errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS) {</span>
+<span class="lineNum">     227 </span>            :                                 /* epoll will call us back */
+<span class="lineNum">     228 </span><span class="lineNoCov">          0 :                                 log_info(&quot;write blocked for id %hu\n&quot;, id);</span>
+<span class="lineNum">     229 </span><span class="lineNoCov">          0 :                                 break;</span>
+<span class="lineNum">     230 </span>            :                         }
+<span class="lineNum">     231 </span><span class="lineNoCov">          0 :                         log_info(&quot;write failed for id %hu: error: %s\n&quot;, id, strerror(errno));</span>
+<span class="lineNum">     232 </span><span class="lineNoCov">          0 :                         return false;</span>
+<span class="lineNum">     233 </span>            :                         break;
+<span class="lineNum">     234 </span>            :                 }
+<span class="lineNum">     235 </span>            :         }
+<span class="lineNum">     236 </span><span class="lineCov">      99999 :         return true;</span>
+<a name="237"><span class="lineNum">     237 </span>            : }</a>
+<span class="lineNum">     238 </span>            : 
+<span class="lineNum">     239 </span><span class="lineCov">     100000 : bool Client::has_write_pending()</span>
+<span class="lineNum">     240 </span>            : {
+<span class="lineNum">     241 </span><span class="lineCov">     100000 :         if(write_pending)</span>
+<a name="242"><span class="lineNum">     242 </span><span class="lineCov">      99999 :                 return true;</span></a>
+<span class="lineNum">     243 </span><span class="lineCov">          1 :         return false;</span>
+<span class="lineNum">     244 </span><span class="lineCov">          6 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>
