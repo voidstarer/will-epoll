@@ -17,9 +17,9 @@ HEADERS = $(wildcard *.hpp)
 %.o: %.cpp $(HEADERS)
 	$(CXX) $(CPPFLAGS) -c $< -o $@
 
-.PRECIOUS: $(TARGET) $(OBJECTS) tcp_server.o server.o
+.PRECIOUS: $(TARGET) $(OBJECTS) tcp_server.o my_server.o
 
-server: $(OBJECTS) tcp_server.o server.o
+server: $(OBJECTS) tcp_server.o my_server.o
 	$(CXX) $? -Wall $(LDFLAGS) -o $@
 
 client: $(OBJECTS) tcp_client.o my_client.o
