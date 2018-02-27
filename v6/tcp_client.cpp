@@ -123,11 +123,7 @@ void TCPClient::handle_write_event(void *ptr)
 {
 	Client *client = (Client*)ptr;
 	assert(client != NULL);
-	if(client->invalid) {
-		/* this is a stale client */
-		log_err("id: %u fd: %d is invalid\n", client->id, client->fd);
-		return;
-	}
+	assert(client->invalid == false);
 
 	log_info("called for id: %u fd: %d\n", client->id, client->fd);
 
@@ -140,6 +136,7 @@ void TCPClient::handle_write_event(void *ptr)
 	if(client->write_data() == false) {
 		/* terrible error, free the client */
 		on_error(client, errno);
+		disconnect();
 	}
 
 	return;
@@ -182,7 +179,6 @@ void TCPClient::disconnect()
 {
 	log_info("called\n");
 	assert(state != DISCONNECTED);
-	on_disconnect(NULL);
 	close(server_fd);
 	server_fd = -1;
 	state=DISCONNECTED;
