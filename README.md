@@ -1,5 +1,4 @@
-# will-epoll
-William's epoll code
+Epoll server and client written in C and C++
 
 V3: Original code
 V4: Code written in C
